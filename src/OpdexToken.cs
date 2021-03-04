@@ -1,29 +1,246 @@
 ﻿using Stratis.SmartContracts;
 using Stratis.SmartContracts.Standards;
 
-/// <summary>
-/// Implementation of a standard token contract for the Stratis Platform.
-/// </summary>
 public class OpdexToken : SmartContract, IStandardToken256
 {
+    private const ulong BlocksPerYear = 2_102_400;
+    private UInt256[] OpdexSchedule = { 50_000_000, 75_000_000, 50_000_000, 25_000_000 };
+    private UInt256[] MiningSchedule = { 300_000_000, 150_000_000, 100_000_000, 50_000_000 };
+    private UInt256[] AdvisorSchedule = { 12_500_000, 17_500_000, 12_500_000, 7_500_000 };
+    private UInt256[] InvestorSchedule = { 37_500_000, 57_500_000, 37_500_000, 17_500_000 };
     
-    /// <summary>
-    /// Constructor used to create a new instance of the token. Assigns the total token supply to the creator of the contract.
-    /// </summary>
-    /// <param name="smartContractState">The execution state for the contract.</param>
-    /// <param name="totalSupply">The total token supply.</param>
-    /// <param name="name">The name of the token.</param>
-    /// <param name="symbol">The symbol used to identify the token.</param>
-    /// <param name="decimals">The amount of decimals for display and calculation purposes.</param>
     public OpdexToken(ISmartContractState smartContractState, UInt256 totalSupply, string name, string symbol, byte decimals)
         : base(smartContractState)
     {
-        this.TotalSupply = totalSupply;
-        this.Name = name;
-        this.Symbol = symbol;
-        this.Decimals = decimals;
-        // this.SetBalance(Message.Sender, totalSupply);
+        Opdex = Message.Sender;
+        Name = name;
+        Symbol = symbol;
+        Decimals = decimals;
+        BlockCreated = Block.Number;
+        DistributionSchedule = new []
+        {
+            Block.Number, 
+            GetBlockForYearIndex(1), 
+            GetBlockForYearIndex(2), 
+            GetBlockForYearIndex(3)
+        };
+        Distribute();
     }
+    
+    private ulong GetBlockForYearIndex(byte index)
+    {
+        var blocksToAdd = BlocksPerYear * (ulong)(index + 1);
+        return Block.Number + blocksToAdd;
+    }
+    
+    public Address Opdex
+    {
+        get => State.GetAddress(nameof(Opdex));
+        private set => State.SetAddress(nameof(Opdex), value);
+    }
+
+    public ulong BlockCreated
+    {
+        get => State.GetUInt64(nameof(BlockCreated));
+        private set => State.SetUInt64(nameof(BlockCreated), value);
+    }
+
+    public UInt256 AdvisorSupply
+    {
+        get => State.GetUInt256(nameof(AdvisorSupply));
+        private set => State.SetUInt256(nameof(AdvisorSupply), value);
+    }
+    
+    public UInt256 InvestorSupply
+    {
+        get => State.GetUInt256(nameof(InvestorSupply));
+        private set => State.SetUInt256(nameof(InvestorSupply), value);
+    }
+
+    public UInt256 MiningSupply
+    {
+        get => State.GetUInt256(nameof(MiningSupply));
+        private set => State.SetUInt256(nameof(MiningSupply), value);
+    }
+
+    public ulong[] DistributionSchedule
+    {
+        get => State.GetArray<ulong>(nameof(DistributionSchedule));
+        private set => State.SetArray(nameof(DistributionSchedule), value);
+    }
+
+    public byte YearIndex
+    {
+        get => State.GetBytes(nameof(YearIndex))[0];
+        private set => State.SetBytes(nameof(YearIndex), new [] {value});
+    }
+
+    public Application GetApplication(Address to)
+    {
+        return State.GetStruct<Application>($"Application:{to}");
+    }
+
+    private void SetApplication(Application application)
+    {
+        State.SetStruct($"Application:{application.To}", application);
+    }
+
+    private void ClearApplication(Address to)
+    {
+        State.Clear($"Application:{to}");
+    }
+    
+    public bool Distribute()
+    {
+        var opdex = Opdex;
+        var yearIndex = YearIndex;
+        var distributionBlock = DistributionSchedule[yearIndex];
+
+        if (Block.Number < distributionBlock)
+        {
+            return false;
+        }
+
+        AdvisorSupply += AdvisorSchedule[yearIndex];
+        InvestorSupply += InvestorSchedule[yearIndex];
+        MiningSupply += MiningSchedule[yearIndex];
+        
+        SetBalance(opdex, GetBalance(opdex) + OpdexSchedule[yearIndex]);
+        
+        TotalSupply += (AdvisorSchedule[yearIndex] + 
+                        InvestorSchedule[yearIndex] + 
+                        MiningSchedule[yearIndex] +
+                        OpdexSchedule[yearIndex]);
+        
+        YearIndex++;
+
+        return true;
+    }
+
+    public void WhitelistPair(Address token)
+    {
+        
+    }
+    
+    public void NominatePair(Address pair)
+    {
+        Assert(State.IsContract(pair), "OPDEX: INVALID_PAIR");
+        
+        // We need to verify this pair is an opdex contract or tokens could get stolen
+        // Possibly nominate a token -> call controller -> get pair -> call pair
+        // Would mean we have to persist the controller address, then it can't change without Opdex admin controllers :(
+    }
+
+    private void CreateMiningContract(Address pair, UInt256 amount, ulong duration)
+    {
+        var miner = Create<OpdexMining>(0ul, new object[] { pair, amount, duration });
+        Assert(miner.Success, "OPDEX: CREATE_MINER_FAILED");
+        
+        var minerAddress = miner.NewContractAddress;
+    }
+
+    public void CreateApplication(byte applicationType, UInt256 amount)
+    {
+        var to = Message.Sender;
+        var existingApplication = GetApplication(to);
+        
+        Assert(existingApplication.To == Address.Zero, "OPDEX: APPLICATION_EXISTS");
+        
+        SetApplication(new Application
+        {
+            To = to,
+            Type = applicationType,
+            Amount = amount
+        });
+        
+        Log(new ApplicationRequestEvent
+        {
+            To = to,
+            Type = applicationType,
+            Amount = amount
+        });
+    }
+
+    public void ReviewApplication(bool approve, Address to)
+    {
+        Assert(Message.Sender == Opdex, "OPDEX: UNAUTHORIZED_REVIEWER");
+
+        var application = GetApplication(to);
+        Assert(application.To == to, "OPDEX: INVALID_RECEIVER");
+
+        if (approve)
+        {
+            if (application.Type == (byte) ApplicationType.Investor)
+            {
+                Assert(InvestorSupply >= application.Amount, "OPDEX: INSUFFICIENT_SUPPLY");
+                InvestorSupply -= application.Amount;
+            }
+            else
+            {
+                Assert(AdvisorSupply >= application.Amount, "OPDEX: INSUFFICIENT_SUPPLY");
+                AdvisorSupply -= application.Amount;
+            }
+
+            var newBalance = GetBalance(to) + application.Amount;
+            SetBalance(to, newBalance);
+        }
+
+        ClearApplication(to);
+
+        Log(new ApplicationReviewEvent
+        {
+            To = application.To,
+            Type = application.Type,
+            Amount = application.Amount,
+            Approved = approve
+        });
+    }
+
+    public struct Application
+    {
+        public byte Type;
+        public UInt256 Amount;
+        public Address To;
+    }
+
+    public struct ApplicationRequestEvent
+    {
+        [Index] public Address To;
+        public byte Type;
+        public UInt256 Amount;
+    }
+    
+    public struct ApplicationReviewEvent
+    {
+        [Index] public Address To;
+        public byte Type;
+        public UInt256 Amount;
+        public bool Approved;
+    }
+
+    public enum ApplicationType : byte
+    {
+        Investor = 0,
+        Advisor = 1
+    }
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    #region StandardToken
 
     public string Symbol
     {
@@ -166,4 +383,6 @@ public class OpdexToken : SmartContract, IStandardToken256
 
         public UInt256 Amount;
     }
+    
+    #endregion
 }
