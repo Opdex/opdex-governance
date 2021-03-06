@@ -7,10 +7,20 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.5.0" />
-        <PackageReference Include="xunit" Version="2.4.0" />
+        <PackageReference Include="FluentAssertions" Version="5.10.3" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.8.3" />
+        <PackageReference Include="Moq" Version="4.16.0" />
+        <PackageReference Include="Stratis.SmartContracts" Version="2.0.1-dev" />
+        <PackageReference Include="Stratis.SmartContracts.CLR" Version="2.0.1" />
+        <PackageReference Include="Stratis.SmartContracts.CLR.Validation" Version="2.0.1" />
+        <PackageReference Include="Stratis.SmartContracts.Networks" Version="2.0.1" />
+        <PackageReference Include="xunit" Version="2.4.1" />
         <PackageReference Include="xunit.runner.visualstudio" Version="2.4.0" />
         <PackageReference Include="coverlet.collector" Version="1.2.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\src\OpdexToken.csproj" />
     </ItemGroup>
 
 </Project>
