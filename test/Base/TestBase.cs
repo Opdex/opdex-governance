@@ -37,20 +37,20 @@ namespace OpdexTokenTests.Base
             Miner = "0x0000000000000000000000000000000000000004".HexToAddress();
         }
 
-        protected OpdexMining CreateNewOpdexMiner(UInt256 amountToDistribute, ulong duration = 100)
-        {
-            if (amountToDistribute == 0)
-            {
-                amountToDistribute = 20_000_000_000_000_000; // 200 million
-            }
-            
-            _mockContractState.Setup(x => x.Message).Returns(new Message(MiningContract, OPDX, 0));
-            _mockContractState.Setup(x => x.Block.Number).Returns(() => 10);
-            
-            SetupBalance(0);
-            
-            return new OpdexMining(_mockContractState.Object, Pair, amountToDistribute, duration);
-        }
+        // protected OpdexMining CreateNewOpdexMiner(UInt256 amountToDistribute, ulong duration = 100)
+        // {
+        //     if (amountToDistribute == 0)
+        //     {
+        //         amountToDistribute = 20_000_000_000_000_000; // 200 million
+        //     }
+        //     
+        //     _mockContractState.Setup(x => x.Message).Returns(new Message(MiningContract, OPDX, 0));
+        //     _mockContractState.Setup(x => x.Block.Number).Returns(() => 10);
+        //     
+        //     SetupBalance(0);
+        //     
+        //     return new OpdexMining(_mockContractState.Object, Pair, amountToDistribute, duration);
+        // }
         
         // protected OpdexPair CreateNewOpdexPair(ulong balance = 0)
         // {

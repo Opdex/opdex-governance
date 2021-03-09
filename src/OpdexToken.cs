@@ -3,7 +3,7 @@ using Stratis.SmartContracts.Standards;
 
 public class OpdexToken : SmartContract, IStandardToken256
 {
-    private const ulong BlocksPerYear = 2_102_400;
+    private const ulong BlocksPerYear = 1_971_000; // based on 16 second blocks
     private UInt256[] OpdexSchedule = { 50_000_000, 75_000_000, 50_000_000, 25_000_000 };
     private UInt256[] MiningSchedule = { 300_000_000, 150_000_000, 100_000_000, 50_000_000 };
     private UInt256[] AdvisorSchedule = { 12_500_000, 17_500_000, 12_500_000, 7_500_000 };
@@ -16,7 +16,7 @@ public class OpdexToken : SmartContract, IStandardToken256
         Name = name;
         Symbol = symbol;
         Decimals = decimals;
-        BlockCreated = Block.Number;
+        Genesis = Block.Number;
         DistributionSchedule = new []
         {
             Block.Number, 
@@ -26,23 +26,17 @@ public class OpdexToken : SmartContract, IStandardToken256
         };
         Distribute();
     }
-    
-    private ulong GetBlockForYearIndex(byte index)
-    {
-        var blocksToAdd = BlocksPerYear * (ulong)(index + 1);
-        return Block.Number + blocksToAdd;
-    }
-    
+
     public Address Opdex
     {
         get => State.GetAddress(nameof(Opdex));
         private set => State.SetAddress(nameof(Opdex), value);
     }
 
-    public ulong BlockCreated
+    public ulong Genesis
     {
-        get => State.GetUInt64(nameof(BlockCreated));
-        private set => State.SetUInt64(nameof(BlockCreated), value);
+        get => State.GetUInt64(nameof(Genesis));
+        private set => State.SetUInt64(nameof(Genesis), value);
     }
 
     public UInt256 AdvisorSupply
@@ -69,10 +63,10 @@ public class OpdexToken : SmartContract, IStandardToken256
         private set => State.SetArray(nameof(DistributionSchedule), value);
     }
 
-    public byte YearIndex
+    public uint YearIndex
     {
-        get => State.GetBytes(nameof(YearIndex))[0];
-        private set => State.SetBytes(nameof(YearIndex), new [] {value});
+        get => State.GetUInt32(nameof(YearIndex));
+        private set => State.SetUInt32(nameof(YearIndex), value);
     }
 
     public Application GetApplication(Address to)
@@ -89,51 +83,58 @@ public class OpdexToken : SmartContract, IStandardToken256
     {
         State.Clear($"Application:{to}");
     }
+
+    private ulong GetBlockForYearIndex(uint index)
+    {
+        var blocksToAdd = BlocksPerYear * (index + 1);
+        return Genesis + blocksToAdd;
+    }
     
     public bool Distribute()
     {
         var opdex = Opdex;
         var yearIndex = YearIndex;
-        var distributionBlock = DistributionSchedule[yearIndex];
-
-        if (Block.Number < distributionBlock)
+        var block = Block.Number;
+        
+        if (yearIndex <= 3)
         {
-            return false;
+            if (block < DistributionSchedule[yearIndex])
+            {
+                return false;
+            }
+            
+            AdvisorSupply += AdvisorSchedule[yearIndex];
+            InvestorSupply += InvestorSchedule[yearIndex];
+            MiningSupply += MiningSchedule[yearIndex];
+        
+            SetBalance(opdex, GetBalance(opdex) + OpdexSchedule[yearIndex]);
+        
+            TotalSupply += AdvisorSchedule[yearIndex] + 
+                           InvestorSchedule[yearIndex] + 
+                           MiningSchedule[yearIndex] +
+                           OpdexSchedule[yearIndex];
         }
+        else
+        {
+            if (block < GetBlockForYearIndex(yearIndex))
+            {
+                return false;
+            }
 
-        AdvisorSupply += AdvisorSchedule[yearIndex];
-        InvestorSupply += InvestorSchedule[yearIndex];
-        MiningSupply += MiningSchedule[yearIndex];
-        
-        SetBalance(opdex, GetBalance(opdex) + OpdexSchedule[yearIndex]);
-        
-        TotalSupply += (AdvisorSchedule[yearIndex] + 
-                        InvestorSchedule[yearIndex] + 
-                        MiningSchedule[yearIndex] +
-                        OpdexSchedule[yearIndex]);
+            var inflation = (TotalSupply / 100) * 2;
+            
+            MiningSupply += inflation;
+            TotalSupply += inflation;
+        }
         
         YearIndex++;
 
         return true;
     }
 
-    public void WhitelistPair(Address token)
-    {
-        
-    }
-    
-    public void NominatePair(Address pair)
-    {
-        Assert(State.IsContract(pair), "OPDEX: INVALID_PAIR");
-        
-        // We need to verify this pair is an opdex contract or tokens could get stolen
-        // Possibly nominate a token -> call controller -> get pair -> call pair
-        // Would mean we have to persist the controller address, then it can't change without Opdex admin controllers :(
-    }
-
     private void CreateMiningContract(Address pair, UInt256 amount, ulong duration)
     {
-        var miner = Create<OpdexMining>(0ul, new object[] { pair, amount, duration });
+        var miner = Create<LiquidityStakingFactory>(0ul, new object[] { pair, amount, duration });
         Assert(miner.Success, "OPDEX: CREATE_MINER_FAILED");
         
         var minerAddress = miner.NewContractAddress;
@@ -161,6 +162,7 @@ public class OpdexToken : SmartContract, IStandardToken256
         });
     }
 
+    // Require 2 Signatures
     public void ReviewApplication(bool approve, Address to)
     {
         Assert(Message.Sender == Opdex, "OPDEX: UNAUTHORIZED_REVIEWER");
