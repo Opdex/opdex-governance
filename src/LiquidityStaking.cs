@@ -8,6 +8,9 @@ public class LiquidityStaking : SmartContract
         RewardsDistribution = rewardsDistribution;
         RewardsToken = rewardsToken;
         StakingToken = stakingToken;
+        RewardsDuration = 328_500 - 41_062; // 8 weeks - 1 week
+        
+        // Todo: Should essentially handle NotifyRewardAmount immediately right here
     }
 
     public Address RewardsDistribution
@@ -101,17 +104,24 @@ public class LiquidityStaking : SmartContract
 
     public UInt256 RewardPerToken()
     {
-        if (TotalSupply == 0)
-        {
-            return RewardPerTokenStored;
-        }
+        if (TotalSupply == 0) return RewardPerTokenStored;
+
+        var blocksToUpdate = LastTimeRewardApplicable() - LastUpdateTime;
         
-        return RewardPerTokenStored + ((LastTimeRewardApplicable() - LastUpdateTime * RewardRate * 100_000_000) / TotalSupply);
+        var result = RewardPerTokenStored + ((blocksToUpdate * RewardRate * 100_000_000) / TotalSupply);
+
+        return result;
     }
 
     public UInt256 Earned(Address address)
     {
-        return GetBalance(address) * (RewardPerToken() - GetUserRewardPerTokenPaid(address)) / 100_000_000 + GetReward(address);
+        var balance = GetBalance(address);
+        var rewardPerToken = RewardPerToken();
+        var userRewardPaid = GetUserRewardPerTokenPaid(address);
+        var remainingReward = rewardPerToken - userRewardPaid;
+        var reward = GetReward(address);
+        
+        return balance * remainingReward / 100_000_000 + reward;
     }
 
     public UInt256 GetRewardForDuration()
@@ -121,68 +131,64 @@ public class LiquidityStaking : SmartContract
     
     public void Stake(UInt256 amount)
     {
-        var sender = Message.Sender;
-        UpdateReward(sender);
+        UpdateReward(Message.Sender);
         
         Assert(amount > 0, "OPDEX: CANNOT_STAKE_ZERO");
-        TotalSupply += amount;
-        SetBalance(sender, GetBalance(sender) + amount);
         
-        SafeTransferFrom(StakingToken, sender, Address, amount);
+        TotalSupply += amount;
+        
+        SetBalance(Message.Sender, GetBalance(Message.Sender) + amount);
+        
+        SafeTransferFrom(StakingToken, Message.Sender, Address, amount);
 
-        Log(new StakedEvent
-        {
-            User = sender,
-            Amount = amount
-        });
+        Log(new StakedEvent { User = Message.Sender, Amount = amount });
     }
 
     public void Withdraw(UInt256 amount)
     {
-        var sender = Message.Sender;
-        UpdateReward(sender);
+        UpdateReward(Message.Sender);
         
         Assert(amount > 0, "OPDEX: CANNOT_WITHDRAW_ZERO");
+        
         TotalSupply -= amount;
-        SetBalance(sender, GetBalance(sender) - amount);
         
-        SafeTransferTo(StakingToken, sender, amount);
+        SetBalance(Message.Sender, GetBalance(Message.Sender) - amount);
         
-        Log( new WithdrawnEvent
-        {
-            User = sender,
-            Amount = amount
-        });
+        SafeTransferTo(StakingToken, Message.Sender, amount);
+        
+        Log(new WithdrawnEvent { User = Message.Sender, Amount = amount });
     }
 
     public void GetReward()
     {
-        var sender = Message.Sender;
-        UpdateReward(sender);
+        UpdateReward(Message.Sender);
 
-        var reward = GetReward(sender);
+        var reward = GetReward(Message.Sender);
 
         if (reward > 0)
         {
-            SetReward(sender, 0);
-            SafeTransferTo(RewardsToken, sender, reward);
-            Log(new RewardPaidEvent
-            {
-                User = sender,
-                Reward = reward
-            });
+            SetReward(Message.Sender, 0);
+            
+            SafeTransferTo(RewardsToken, Message.Sender, reward);
+            
+            Log(new RewardPaidEvent { User = Message.Sender, Reward = reward });
         }
     }
 
     public void Exit()
     {
         Withdraw(GetBalance(Message.Sender));
+        
         GetReward();
     }
 
+    // Todo: Refactor to handle this on contract creation
+    // If Else isn't needed then 
+    // Check balance isn't needed then, expected from creation
     public void NotifyRewardAmount(UInt256 reward)
     {
         Assert(Message.Sender == RewardsDistribution);
+        
         UpdateReward(Address.Zero);
         
         if (Block.Number >= PeriodFinish)
@@ -193,11 +199,13 @@ public class LiquidityStaking : SmartContract
         {
             var remaining = PeriodFinish - Block.Number;
             var leftover = remaining * RewardRate;
+            
             RewardRate = reward + leftover / RewardsDuration;
         }
 
         var balanceResult = Call(RewardsToken, 0, "GetBalance", new object[] {Address});
         var balance = (UInt256) balanceResult.ReturnValue;
+        
         Assert(balanceResult.Success && balance > 0);
         Assert(RewardRate <= balance / RewardsDuration, "OPDEX: PROVIDED_REWARD_TOO_HIGH");
 
@@ -209,13 +217,17 @@ public class LiquidityStaking : SmartContract
 
     private void UpdateReward(Address account)
     {
-        RewardPerTokenStored = RewardPerToken();
+        var rewardPerToken = RewardPerToken();
+        
+        RewardPerTokenStored = rewardPerToken;
         LastUpdateTime = LastTimeRewardApplicable();
 
         if (account != Address.Zero)
         {
-            SetReward(account, Earned(account));
-            SetUserRewardPerTokenPaid(account, RewardPerTokenStored);
+            var earned = Earned(account);
+            SetReward(account, earned);
+            
+            SetUserRewardPerTokenPaid(account, rewardPerToken);
         }
     }
     

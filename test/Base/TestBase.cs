@@ -18,6 +18,7 @@ namespace OpdexTokenTests.Base
         protected readonly Address Pair;
         protected readonly Address OPDX;
         protected readonly Address Miner;
+        protected readonly Address Factory;
         protected readonly InMemoryState PersistentState;
 
         protected TestBase()
@@ -35,6 +36,7 @@ namespace OpdexTokenTests.Base
             Pair = "0x0000000000000000000000000000000000000002".HexToAddress();
             OPDX = "0x0000000000000000000000000000000000000003".HexToAddress();
             Miner = "0x0000000000000000000000000000000000000004".HexToAddress();
+            Factory = "0x0000000000000000000000000000000000000005".HexToAddress();
         }
 
         // protected OpdexMining CreateNewOpdexMiner(UInt256 amountToDistribute, ulong duration = 100)
@@ -60,6 +62,15 @@ namespace OpdexTokenTests.Base
         //     return new OpdexPair(_mockContractState.Object, Token, StakeToken);
         // }
 
+        protected LiquidityStaking CreateNewLiquidityStaking(ulong block = 10)
+        {
+            _mockContractState.Setup(x => x.Message).Returns(new Message(MiningContract, OPDX, 0));
+            SetupBlock(block);
+            SetupBalance(0);
+            
+            return new LiquidityStaking(_mockContractState.Object, Factory, OPDX, Pair);
+        }
+
         protected void SetupMessage(Address contractAddress, Address sender, ulong value = 0)
         {
             _mockContractState.Setup(x => x.Message).Returns(new Message(contractAddress, sender, value));
@@ -70,6 +81,11 @@ namespace OpdexTokenTests.Base
         protected void SetupBalance(ulong balance)
         {
             _mockContractState.Setup(x => x.GetBalance).Returns(() => balance);
+        }
+
+        protected void SetupBlock(ulong block)
+        {
+            _mockContractState.Setup(x => x.Block.Number).Returns(() => block);
         }
 
         protected void SetupCall(Address to, ulong amountToTransfer, string methodName, object[] parameters, TransferResult result, Action callback = null)

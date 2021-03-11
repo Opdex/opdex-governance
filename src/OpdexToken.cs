@@ -1,36 +1,36 @@
 ﻿using Stratis.SmartContracts;
 using Stratis.SmartContracts.Standards;
 
-public class OpdexToken : SmartContract, IStandardToken256
+[Deploy]
+public class OpdexToken : StandardToken, IStandardToken256
 {
     private const ulong BlocksPerYear = 1_971_000; // based on 16 second blocks
-    private UInt256[] OpdexSchedule = { 50_000_000, 75_000_000, 50_000_000, 25_000_000 };
-    private UInt256[] MiningSchedule = { 300_000_000, 150_000_000, 100_000_000, 50_000_000 };
-    private UInt256[] AdvisorSchedule = { 12_500_000, 17_500_000, 12_500_000, 7_500_000 };
-    private UInt256[] InvestorSchedule = { 37_500_000, 57_500_000, 37_500_000, 17_500_000 };
     
-    public OpdexToken(ISmartContractState smartContractState, UInt256 totalSupply, string name, string symbol, byte decimals)
-        : base(smartContractState)
+    // Todo: This shouldn't be hardcoded here
+    private readonly UInt256[] _ownerSchedule = { 50_000_000, 75_000_000, 50_000_000, 25_000_000 };
+    private readonly UInt256[] _miningSchedule = { 300_000_000, 150_000_000, 100_000_000, 50_000_000 };
+    private readonly UInt256[] _advisorSchedule = { 12_500_000, 17_500_000, 12_500_000, 7_500_000 };
+    private readonly UInt256[] _investorSchedule = { 37_500_000, 57_500_000, 37_500_000, 17_500_000 };
+    
+    public OpdexToken(ISmartContractState contractState, string name, string symbol, byte decimals)
+        : base(contractState, name, symbol, decimals)
     {
-        Opdex = Message.Sender;
-        Name = name;
-        Symbol = symbol;
-        Decimals = decimals;
+        Owner = Message.Sender;
         Genesis = Block.Number;
-        DistributionSchedule = new []
-        {
-            Block.Number, 
-            GetBlockForYearIndex(1), 
-            GetBlockForYearIndex(2), 
-            GetBlockForYearIndex(3)
-        };
+        MiningGovernance = CreateMiningGovernanceContract();
         Distribute();
     }
 
-    public Address Opdex
+    public Address Owner
     {
-        get => State.GetAddress(nameof(Opdex));
-        private set => State.SetAddress(nameof(Opdex), value);
+        get => State.GetAddress(nameof(Owner));
+        private set => State.SetAddress(nameof(Owner), value);
+    }
+    
+    public Address MiningGovernance
+    {
+        get => State.GetAddress(nameof(MiningGovernance));
+        private set => State.SetAddress(nameof(MiningGovernance), value);
     }
 
     public ulong Genesis
@@ -49,18 +49,6 @@ public class OpdexToken : SmartContract, IStandardToken256
     {
         get => State.GetUInt256(nameof(InvestorSupply));
         private set => State.SetUInt256(nameof(InvestorSupply), value);
-    }
-
-    public UInt256 MiningSupply
-    {
-        get => State.GetUInt256(nameof(MiningSupply));
-        private set => State.SetUInt256(nameof(MiningSupply), value);
-    }
-
-    public ulong[] DistributionSchedule
-    {
-        get => State.GetArray<ulong>(nameof(DistributionSchedule));
-        private set => State.SetArray(nameof(DistributionSchedule), value);
     }
 
     public uint YearIndex
@@ -86,44 +74,42 @@ public class OpdexToken : SmartContract, IStandardToken256
 
     private ulong GetBlockForYearIndex(uint index)
     {
-        var blocksToAdd = BlocksPerYear * (index + 1);
-        return Genesis + blocksToAdd;
+        var genesis = Genesis;
+        
+        if (index == 0) return genesis;
+        
+        return BlocksPerYear * index + genesis;
     }
     
     public bool Distribute()
     {
-        var opdex = Opdex;
+        var owner = Owner;
+        var miningGov = MiningGovernance;
         var yearIndex = YearIndex;
         var block = Block.Number;
         
+        if (block < GetBlockForYearIndex(yearIndex)) return false;
+        
         if (yearIndex <= 3)
         {
-            if (block < DistributionSchedule[yearIndex])
-            {
-                return false;
-            }
+            var advisorTokens = _advisorSchedule[yearIndex];
+            var investorTokens = _investorSchedule[yearIndex];
+            var miningTokens = _miningSchedule[yearIndex];
+            var ownerTokens = _ownerSchedule[yearIndex];
             
-            AdvisorSupply += AdvisorSchedule[yearIndex];
-            InvestorSupply += InvestorSchedule[yearIndex];
-            MiningSupply += MiningSchedule[yearIndex];
-        
-            SetBalance(opdex, GetBalance(opdex) + OpdexSchedule[yearIndex]);
-        
-            TotalSupply += AdvisorSchedule[yearIndex] + 
-                           InvestorSchedule[yearIndex] + 
-                           MiningSchedule[yearIndex] +
-                           OpdexSchedule[yearIndex];
+            AdvisorSupply += advisorTokens;
+            InvestorSupply += investorTokens;
+            TotalSupply += advisorTokens + investorTokens + miningTokens + ownerTokens;
+            
+            SetBalance(owner, GetBalance(owner) + ownerTokens);
+            SetBalance(miningGov, GetBalance(miningGov) + miningTokens);
         }
         else
         {
-            if (block < GetBlockForYearIndex(yearIndex))
-            {
-                return false;
-            }
-
             var inflation = (TotalSupply / 100) * 2;
             
-            MiningSupply += inflation;
+            SetBalance(miningGov, GetBalance(miningGov) + inflation);
+
             TotalSupply += inflation;
         }
         
@@ -131,15 +117,7 @@ public class OpdexToken : SmartContract, IStandardToken256
 
         return true;
     }
-
-    private void CreateMiningContract(Address pair, UInt256 amount, ulong duration)
-    {
-        var miner = Create<LiquidityStakingFactory>(0ul, new object[] { pair, amount, duration });
-        Assert(miner.Success, "OPDEX: CREATE_MINER_FAILED");
-        
-        var minerAddress = miner.NewContractAddress;
-    }
-
+    
     public void CreateApplication(byte applicationType, UInt256 amount)
     {
         var to = Message.Sender;
@@ -162,10 +140,10 @@ public class OpdexToken : SmartContract, IStandardToken256
         });
     }
 
-    // Require 2 Signatures
     public void ReviewApplication(bool approve, Address to)
     {
-        Assert(Message.Sender == Opdex, "OPDEX: UNAUTHORIZED_REVIEWER");
+        // Require Multiple Signatures/Reviewers
+        Assert(Message.Sender == Owner, "OPDEX: UNAUTHORIZED_REVIEWER");
 
         var application = GetApplication(to);
         Assert(application.To == to, "OPDEX: INVALID_RECEIVER");
@@ -198,6 +176,15 @@ public class OpdexToken : SmartContract, IStandardToken256
         });
     }
 
+    private Address CreateMiningGovernanceContract()
+    {
+        var miner = Create<LiquidityStakingFactory>(0ul, new object[] { Address, Block.Number, Address.Zero });
+        
+        Assert(miner.Success && miner.NewContractAddress != Address.Zero, "OPDEX: CREATE_MINER_FAILED");
+        
+        return miner.NewContractAddress;
+    }
+    
     public struct Application
     {
         public byte Type;
@@ -225,166 +212,4 @@ public class OpdexToken : SmartContract, IStandardToken256
         Investor = 0,
         Advisor = 1
     }
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    #region StandardToken
-
-    public string Symbol
-    {
-        get => State.GetString(nameof(this.Symbol));
-        private set => State.SetString(nameof(this.Symbol), value);
-    }
-
-    public string Name
-    {
-        get => State.GetString(nameof(this.Name));
-        private set => State.SetString(nameof(this.Name), value);
-    }
-
-    /// <inheritdoc />
-    public byte Decimals
-    {
-        get => State.GetBytes(nameof(this.Decimals))[0];
-        private set => State.SetBytes(nameof(this.Decimals), new[] { value });
-    }
-
-    /// <inheritdoc />
-    public UInt256 TotalSupply
-    {
-        get => State.GetUInt256(nameof(this.TotalSupply));
-        private set => State.SetUInt256(nameof(this.TotalSupply), value);
-    }
-
-    /// <inheritdoc />
-    public UInt256 GetBalance(Address address)
-    {
-        return State.GetUInt256($"Balance:{address}");
-    }
-
-    private void SetBalance(Address address, UInt256 value)
-    {
-        State.SetUInt256($"Balance:{address}", value);
-    }
-
-    /// <inheritdoc />
-    public bool TransferTo(Address to, UInt256 amount)
-    {
-        if (amount == 0)
-        {
-            Log(new TransferLog { From = Message.Sender, To = to, Amount = 0 });
-
-            return true;
-        }
-
-        UInt256 senderBalance = GetBalance(Message.Sender);
-
-        if (senderBalance < amount)
-        {
-            return false;
-        }
-
-        SetBalance(Message.Sender, senderBalance - amount);
-
-        SetBalance(to, checked(GetBalance(to) + amount));
-
-        Log(new TransferLog { From = Message.Sender, To = to, Amount = amount });
-
-        return true;
-    }
-
-    /// <inheritdoc />
-    public bool TransferFrom(Address from, Address to, UInt256 amount)
-    {
-        if (amount == 0)
-        {
-            Log(new TransferLog { From = from, To = to, Amount = 0 });
-
-            return true;
-        }
-
-        UInt256 senderAllowance = Allowance(from, Message.Sender);
-        UInt256 fromBalance = GetBalance(from);
-
-        if (senderAllowance < amount || fromBalance < amount)
-        {
-            return false;
-        }
-
-        SetApproval(from, Message.Sender, senderAllowance - amount);
-
-        SetBalance(from, fromBalance - amount);
-
-        SetBalance(to, checked(GetBalance(to) + amount));
-
-        Log(new TransferLog { From = from, To = to, Amount = amount });
-
-        return true;
-    }
-
-    /// <inheritdoc />
-    public bool Approve(Address spender, UInt256 currentAmount, UInt256 amount)
-    {
-        if (Allowance(Message.Sender, spender) != currentAmount)
-        {
-            return false;
-        }
-
-        SetApproval(Message.Sender, spender, amount);
-
-        Log(new ApprovalLog { Owner = Message.Sender, Spender = spender, Amount = amount, OldAmount = currentAmount });
-
-        return true;
-    }
-
-    private void SetApproval(Address owner, Address spender, UInt256 value)
-    {
-        State.SetUInt256($"Allowance:{owner}:{spender}", value);
-    }
-
-    /// <inheritdoc />
-    public UInt256 Allowance(Address owner, Address spender)
-    {
-        return State.GetUInt256($"Allowance:{owner}:{spender}");
-    }
-
-    public struct TransferLog
-    {
-        [Index]
-        public Address From;
-
-        [Index]
-        public Address To;
-
-        public UInt256 Amount;
-    }
-
-    public struct ApprovalLog
-    {
-        [Index]
-        public Address Owner;
-
-        [Index]
-        public Address Spender;
-
-        public UInt256 OldAmount;
-
-        public UInt256 Amount;
-    }
-    
-    #endregion
 }

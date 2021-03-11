@@ -1,5 +1,3 @@
-using System;
-using System.Reflection;
 using Stratis.SmartContracts;
 
 /// <summary>
@@ -15,21 +13,24 @@ using Stratis.SmartContracts;
 /// </summary>
 public class LiquidityStakingFactory : SmartContract
 {
-    public const uint MaximumConcurrentContracts = 4;
-    public const uint BlocksPerYear = 1_971_000;
-    public const uint TwoMonthsBlocks = 328_500; // Blocks pr year / 6
-    public const uint OneWeekBlocks = 41_062; // 2 months divided by 8
-    public const uint ContractsPerYear = 24; // 4 concurrent sc * 6 periods yr
-    public const uint PeriodsPerYear = 6; // 2 months
+    private const uint MaximumConcurrentContracts = 4;
+    private const uint BlocksPerYear = 1_971_000;
+    private const uint TwoMonthsBlocks = 328_500; // Blocks pr year / 6
+    private const uint OneWeekBlocks = 41_062; // 2 months divided by 8
+    private const uint ContractsPerYear = 24; // 4 concurrent sc * 6 periods yr
+    private const uint PeriodsPerYear = 6; // 2 months
         
     public LiquidityStakingFactory(ISmartContractState contractState, Address rewardToken, ulong genesis, Address controller) : base(contractState)
     {
         Assert(genesis >= Block.Number, "OPDEX: GENESIS_TOO_SOON");
 
         RewardToken = rewardToken;
-        Genesis = genesis;
+        Genesis = Block.Number + OneWeekBlocks; // When token is minted, one week to activate mining
         Owner = Message.Sender;
         Controller = controller;
+        
+        // Todo: Should deploy 4 initial mining contracts taken in from byte[] in the constructor
+        // The genesis block for mining in those mining contracts would be one week out
     }
 
     // public Address[] StakingTokens
@@ -106,13 +107,13 @@ public class LiquidityStakingFactory : SmartContract
     {
         Assert(Message.Sender == Owner);
         var info = GetStakingRewardsInfo(stakingToken);
-        Assert(info.StakingRewards == Address.Zero, "Already Deployed");
+        Assert(info.StakingAddress == Address.Zero, "Already Deployed");
 
         var liquidityStakingContract = Create<LiquidityStaking>(0ul, new object[] { Address, RewardToken, stakingToken });
         
-        info.StakingRewards = liquidityStakingContract.NewContractAddress;
+        info.StakingAddress = liquidityStakingContract.NewContractAddress;
         info.RewardAmount = rewardAmount;
-        SetStakingRewardsInfo(info.StakingRewards, info);
+        SetStakingRewardsInfo(info.StakingAddress, info);
         
         // Would add to array of tokens
     }
@@ -124,16 +125,16 @@ public class LiquidityStakingFactory : SmartContract
         Assert(Block.Number >= Genesis, "Reward amount not ready");
 
         var info = GetStakingRewardsInfo(stakingToken);
-        Assert(info.StakingRewards != Address.Zero, "Not Deployed");
+        Assert(info.StakingAddress != Address.Zero, "Not Deployed");
 
         if (info.RewardAmount > 0)
         {
             var rewardAmount = info.RewardAmount;
             info.RewardAmount = 0;
             
-            SafeTransferTo(RewardToken, info.StakingRewards, rewardAmount);
+            SafeTransferTo(RewardToken, info.StakingAddress, rewardAmount);
 
-            var result = Call(info.StakingRewards, 0, "NotifyRewardAmount");
+            var result = Call(info.StakingAddress, 0, "NotifyRewardAmount");
             Assert(result.Success);
         }
     }
@@ -149,7 +150,7 @@ public class LiquidityStakingFactory : SmartContract
 
     public struct StakingRewardsInfo
     {
-        public Address StakingRewards;
+        public Address StakingAddress;
         public UInt256 RewardAmount;
     }
 
@@ -157,15 +158,15 @@ public class LiquidityStakingFactory : SmartContract
     {
         Assert(!NominationEnabled);
         
-        // Todo: Validate that there are no active contracts - 4 calls (maybe can be done by block count)
-        // Todo: Hit controller to validate it's an opdex pair
+        // Todo: Validate that there are no active contracts - 4 calls
+        // - maybe can be done by block count without the 4 calls
 
         var success = true;
         Assert(success, "OPDEX: NOMINATION_DISABLED");
         NominationEnabled = true;
     }
 
-    // Todo: Need a way to deploy safely one by one if gas gets high
+    // Todo: Refactor, need a way to deploy safely one by one if gas gets high
     public void DeployNominations()
     {
         Assert(!NominationEnabled && DeploymentsAvailable);
@@ -181,7 +182,6 @@ public class LiquidityStakingFactory : SmartContract
         DeploymentsAvailable = false;
     }
     
-    // Todo: What to do if there are no nominations? Burn tokens?
     public bool Nominate(Address pair)
     {
         Assert(NominationEnabled);
@@ -195,6 +195,7 @@ public class LiquidityStakingFactory : SmartContract
             // Deploy or just end it and do nothing?
         }
         
+        // Validate through the set Controller that it is an OPDEX pair
         var isPairResponse = Call(Controller, 0, "ValidatePair", new object[] {pair});
         Assert((bool)isPairResponse.ReturnValue, "OPDEX: INVALID_PAIR");
         
@@ -213,6 +214,7 @@ public class LiquidityStakingFactory : SmartContract
             
             var nomination = new Nomination {Pair = pair, Weight = weight};
 
+            // Todo: This can be better
             Nominations = i switch
             {
                 0 => new[] {nomination, nominations[0], nominations[1], nominations[2]},
