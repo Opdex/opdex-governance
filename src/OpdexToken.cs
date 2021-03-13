@@ -9,16 +9,14 @@ public class OpdexToken : StandardToken, IStandardToken256
     // Todo: This shouldn't be hardcoded here
     private readonly UInt256[] _ownerSchedule = { 50_000_000, 75_000_000, 50_000_000, 25_000_000 };
     private readonly UInt256[] _miningSchedule = { 300_000_000, 150_000_000, 100_000_000, 50_000_000 };
-    private readonly UInt256[] _advisorSchedule = { 12_500_000, 17_500_000, 12_500_000, 7_500_000 };
-    private readonly UInt256[] _investorSchedule = { 37_500_000, 57_500_000, 37_500_000, 17_500_000 };
+    private readonly UInt256[] _treasurySchedule = { 50_000_000, 75_000_000, 50_000_000, 25_000_000 };
     
     public OpdexToken(ISmartContractState contractState, string name, string symbol, byte decimals)
         : base(contractState, name, symbol, decimals)
     {
         Owner = Message.Sender;
         Genesis = Block.Number;
-        MiningGovernance = CreateMiningGovernanceContract();
-        Distribute();
+        MiningGovernance = Create<LiquidityStakingGovernance>(0ul, new object [] { Address }).NewContractAddress;
     }
 
     public Address Owner
@@ -38,17 +36,11 @@ public class OpdexToken : StandardToken, IStandardToken256
         get => State.GetUInt64(nameof(Genesis));
         private set => State.SetUInt64(nameof(Genesis), value);
     }
-
-    public UInt256 AdvisorSupply
-    {
-        get => State.GetUInt256(nameof(AdvisorSupply));
-        private set => State.SetUInt256(nameof(AdvisorSupply), value);
-    }
     
-    public UInt256 InvestorSupply
+    public UInt256 TreasurySupply
     {
-        get => State.GetUInt256(nameof(InvestorSupply));
-        private set => State.SetUInt256(nameof(InvestorSupply), value);
+        get => State.GetUInt256(nameof(TreasurySupply));
+        private set => State.SetUInt256(nameof(TreasurySupply), value);
     }
 
     public uint YearIndex
@@ -81,35 +73,46 @@ public class OpdexToken : StandardToken, IStandardToken256
         return BlocksPerYear * index + genesis;
     }
     
-    public bool Distribute()
+    public bool Distribute(byte[] stakingTokens)
     {
-        var owner = Owner;
         var miningGov = MiningGovernance;
-        var yearIndex = YearIndex;
-        var block = Block.Number;
+        Assert(miningGov != Address.Zero);
         
-        if (block < GetBlockForYearIndex(yearIndex)) return false;
+        var owner = Owner;
+        var yearIndex = YearIndex;
+
+        if (Block.Number < GetBlockForYearIndex(yearIndex)) return false;
         
         if (yearIndex <= 3)
         {
-            var advisorTokens = _advisorSchedule[yearIndex];
-            var investorTokens = _investorSchedule[yearIndex];
+            var treasuryTokens = _treasurySchedule[yearIndex];
             var miningTokens = _miningSchedule[yearIndex];
             var ownerTokens = _ownerSchedule[yearIndex];
             
-            AdvisorSupply += advisorTokens;
-            InvestorSupply += investorTokens;
-            TotalSupply += advisorTokens + investorTokens + miningTokens + ownerTokens;
+            // Todo: Create Treasury Contract
+            TreasurySupply += treasuryTokens;
+            TotalSupply += treasuryTokens + miningTokens + ownerTokens;
             
             SetBalance(owner, GetBalance(owner) + ownerTokens);
             SetBalance(miningGov, GetBalance(miningGov) + miningTokens);
+
+            if (yearIndex == 0)
+            {
+                Call(MiningGovernance, 0ul, "Initialize", new object[] {stakingTokens});
+            }
         }
         else
         {
-            var inflation = (TotalSupply / 100) * 2;
+            var inflation = TotalSupply / 100 * 2;
+            var twentyPercentInflation = inflation / 100 * 20;
+            var treasuryInflation = twentyPercentInflation;
+            var ownerInflation = twentyPercentInflation;
+            var miningInflation = inflation - (treasuryInflation + ownerInflation);
             
-            SetBalance(miningGov, GetBalance(miningGov) + inflation);
+            SetBalance(miningGov, GetBalance(miningGov) + miningInflation);
+            SetBalance(owner, GetBalance(owner) + ownerInflation);
 
+            TreasurySupply += treasuryInflation;
             TotalSupply += inflation;
         }
         
@@ -118,15 +121,15 @@ public class OpdexToken : StandardToken, IStandardToken256
         return true;
     }
     
-    public void CreateApplication(byte applicationType, UInt256 amount)
+    public void CreateApplication(byte applicationType, UInt256 amount, Address to)
     {
-        var to = Message.Sender;
         var existingApplication = GetApplication(to);
         
         Assert(existingApplication.To == Address.Zero, "OPDEX: APPLICATION_EXISTS");
         
         SetApplication(new Application
         {
+            From = Message.Sender,
             To = to,
             Type = applicationType,
             Amount = amount
@@ -134,32 +137,25 @@ public class OpdexToken : StandardToken, IStandardToken256
         
         Log(new ApplicationRequestEvent
         {
+            From = Message.Sender,
             To = to,
             Type = applicationType,
             Amount = amount
         });
     }
 
-    public void ReviewApplication(bool approve, Address to)
+    public void ReviewApplication(bool approval, Address to)
     {
         // Require Multiple Signatures/Reviewers
         Assert(Message.Sender == Owner, "OPDEX: UNAUTHORIZED_REVIEWER");
 
         var application = GetApplication(to);
-        Assert(application.To == to, "OPDEX: INVALID_RECEIVER");
+        Assert(application.To != Address.Zero, "OPDEX: INVALID_RECEIVER");
 
-        if (approve)
+        if (approval)
         {
-            if (application.Type == (byte) ApplicationType.Investor)
-            {
-                Assert(InvestorSupply >= application.Amount, "OPDEX: INSUFFICIENT_SUPPLY");
-                InvestorSupply -= application.Amount;
-            }
-            else
-            {
-                Assert(AdvisorSupply >= application.Amount, "OPDEX: INSUFFICIENT_SUPPLY");
-                AdvisorSupply -= application.Amount;
-            }
+            Assert(TreasurySupply >= application.Amount, "OPDEX: INSUFFICIENT_SUPPLY");
+            TreasurySupply -= application.Amount;
 
             var newBalance = GetBalance(to) + application.Amount;
             SetBalance(to, newBalance);
@@ -169,24 +165,17 @@ public class OpdexToken : StandardToken, IStandardToken256
 
         Log(new ApplicationReviewEvent
         {
+            From = application.From,
             To = application.To,
             Type = application.Type,
             Amount = application.Amount,
-            Approved = approve
+            Approved = approval
         });
-    }
-
-    private Address CreateMiningGovernanceContract()
-    {
-        var miner = Create<LiquidityStakingFactory>(0ul, new object[] { Address, Block.Number, Address.Zero });
-        
-        Assert(miner.Success && miner.NewContractAddress != Address.Zero, "OPDEX: CREATE_MINER_FAILED");
-        
-        return miner.NewContractAddress;
     }
     
     public struct Application
     {
+        public Address From;
         public byte Type;
         public UInt256 Amount;
         public Address To;
@@ -194,6 +183,7 @@ public class OpdexToken : StandardToken, IStandardToken256
 
     public struct ApplicationRequestEvent
     {
+        [Index] public Address From;
         [Index] public Address To;
         public byte Type;
         public UInt256 Amount;
@@ -201,6 +191,7 @@ public class OpdexToken : StandardToken, IStandardToken256
     
     public struct ApplicationReviewEvent
     {
+        [Index] public Address From;
         [Index] public Address To;
         public byte Type;
         public UInt256 Amount;
@@ -210,6 +201,8 @@ public class OpdexToken : StandardToken, IStandardToken256
     public enum ApplicationType : byte
     {
         Investor = 0,
-        Advisor = 1
+        Advisor = 1,
+        Miner = 2,
+        Other = 3
     }
 }

@@ -9,8 +9,6 @@ public class LiquidityStaking : SmartContract
         RewardsToken = rewardsToken;
         StakingToken = stakingToken;
         RewardsDuration = 328_500 - 41_062; // 8 weeks - 1 week
-        
-        // Todo: Should essentially handle NotifyRewardAmount immediately right here
     }
 
     public Address RewardsDistribution
@@ -181,10 +179,7 @@ public class LiquidityStaking : SmartContract
         
         GetReward();
     }
-
-    // Todo: Refactor to handle this on contract creation
-    // If Else isn't needed then 
-    // Check balance isn't needed then, expected from creation
+    
     public void NotifyRewardAmount(UInt256 reward)
     {
         Assert(Message.Sender == RewardsDistribution);
