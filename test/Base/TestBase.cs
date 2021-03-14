@@ -19,6 +19,7 @@ namespace OpdexTokenTests.Base
         protected readonly Address OPDX;
         protected readonly Address Miner;
         protected readonly Address Factory;
+        protected readonly Address Owner;
         protected readonly InMemoryState PersistentState;
 
         protected TestBase()
@@ -37,6 +38,7 @@ namespace OpdexTokenTests.Base
             OPDX = "0x0000000000000000000000000000000000000003".HexToAddress();
             Miner = "0x0000000000000000000000000000000000000004".HexToAddress();
             Factory = "0x0000000000000000000000000000000000000005".HexToAddress();
+            Owner = "0x0000000000000000000000000000000000000006".HexToAddress();
         }
 
         // protected OpdexMining CreateNewOpdexMiner(UInt256 amountToDistribute, ulong duration = 100)
@@ -54,13 +56,15 @@ namespace OpdexTokenTests.Base
         //     return new OpdexMining(_mockContractState.Object, Pair, amountToDistribute, duration);
         // }
         
-        // protected OpdexPair CreateNewOpdexPair(ulong balance = 0)
-        // {
-        //     _mockContractState.Setup(x => x.Message).Returns(new Message(Pair, Controller, 0));
-        //     PersistentState.SetContract(StakeToken, true);
-        //     SetupBalance(balance);
-        //     return new OpdexPair(_mockContractState.Object, Token, StakeToken);
-        // }
+        protected OpdexToken CreateNewOpdexToken(ulong block = 10)
+        {
+            _mockContractState.Setup(x => x.Message).Returns(new Message(OPDX, Owner, 0));
+            SetupBalance(0);
+            SetupBlock(block);
+            SetupCreate<LiquidityStakingGovernance>(CreateResult.Succeeded(Factory), 0ul, new object[] { OPDX });
+            
+            return new OpdexToken(_mockContractState.Object, "Opdex", "OPDX", 8);
+        }
 
         protected LiquidityStaking CreateNewLiquidityStaking(ulong block = 10)
         {

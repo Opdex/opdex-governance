@@ -10,6 +10,7 @@ public class OpdexToken : StandardToken, IStandardToken256
     private readonly UInt256[] _ownerSchedule = { 50_000_000, 75_000_000, 50_000_000, 25_000_000 };
     private readonly UInt256[] _miningSchedule = { 300_000_000, 150_000_000, 100_000_000, 50_000_000 };
     private readonly UInt256[] _treasurySchedule = { 50_000_000, 75_000_000, 50_000_000, 25_000_000 };
+    private readonly UInt256 _inflation = 25_000_000;
     
     public OpdexToken(ISmartContractState contractState, string name, string symbol, byte decimals)
         : base(contractState, name, symbol, decimals)
@@ -76,46 +77,44 @@ public class OpdexToken : StandardToken, IStandardToken256
     public bool Distribute(byte[] stakingTokens)
     {
         var miningGov = MiningGovernance;
-        Assert(miningGov != Address.Zero);
-        
         var owner = Owner;
         var yearIndex = YearIndex;
 
         if (Block.Number < GetBlockForYearIndex(yearIndex)) return false;
-        
+
+        UInt256 treasuryTokens;
+        UInt256 miningTokens;
+        UInt256 ownerTokens;
+        UInt256 supplyIncrease;
+
         if (yearIndex <= 3)
         {
-            var treasuryTokens = _treasurySchedule[yearIndex];
-            var miningTokens = _miningSchedule[yearIndex];
-            var ownerTokens = _ownerSchedule[yearIndex];
-            
-            // Todo: Create Treasury Contract
-            TreasurySupply += treasuryTokens;
-            TotalSupply += treasuryTokens + miningTokens + ownerTokens;
-            
-            SetBalance(owner, GetBalance(owner) + ownerTokens);
-            SetBalance(miningGov, GetBalance(miningGov) + miningTokens);
-
-            if (yearIndex == 0)
-            {
-                Call(MiningGovernance, 0ul, "Initialize", new object[] {stakingTokens});
-            }
+            ownerTokens = _ownerSchedule[yearIndex];
+            treasuryTokens = _treasurySchedule[yearIndex];
+            miningTokens = _miningSchedule[yearIndex];
+            supplyIncrease = treasuryTokens + miningTokens + ownerTokens;
         }
         else
         {
-            var inflation = TotalSupply / 100 * 2;
-            var twentyPercentInflation = inflation / 100 * 20;
-            var treasuryInflation = twentyPercentInflation;
-            var ownerInflation = twentyPercentInflation;
-            var miningInflation = inflation - (treasuryInflation + ownerInflation);
+            var twentyPercentInflation = _inflation / 100 * 20;
             
-            SetBalance(miningGov, GetBalance(miningGov) + miningInflation);
-            SetBalance(owner, GetBalance(owner) + ownerInflation);
-
-            TreasurySupply += treasuryInflation;
-            TotalSupply += inflation;
+            ownerTokens = twentyPercentInflation;
+            treasuryTokens = twentyPercentInflation;
+            miningTokens = _inflation - (ownerTokens + treasuryTokens);
+            supplyIncrease = _inflation;
         }
         
+        SetBalance(owner, GetBalance(owner) + ownerTokens);
+        SetBalance(miningGov, GetBalance(miningGov) + miningTokens);
+        
+        if (yearIndex == 0)
+        {
+            Call(MiningGovernance, 0ul, "Initialize", new object[] {stakingTokens});
+        }
+        
+        // Todo: Create Treasury Contract
+        TreasurySupply += treasuryTokens;
+        TotalSupply += supplyIncrease;
         YearIndex++;
 
         return true;
@@ -147,6 +146,7 @@ public class OpdexToken : StandardToken, IStandardToken256
     public void ReviewApplication(bool approval, Address to)
     {
         // Require Multiple Signatures/Reviewers
+        // Todo: What if the owner changes over the years?
         Assert(Message.Sender == Owner, "OPDEX: UNAUTHORIZED_REVIEWER");
 
         var application = GetApplication(to);
@@ -157,8 +157,7 @@ public class OpdexToken : StandardToken, IStandardToken256
             Assert(TreasurySupply >= application.Amount, "OPDEX: INSUFFICIENT_SUPPLY");
             TreasurySupply -= application.Amount;
 
-            var newBalance = GetBalance(to) + application.Amount;
-            SetBalance(to, newBalance);
+            SetBalance(to, GetBalance(to) + application.Amount);
         }
 
         ClearApplication(to);

@@ -1,5 +1,8 @@
 using Stratis.SmartContracts;
 
+// Todo: Initial setting and enforcement of NominationPeriodEnd
+// Todo: Initial deploy restrict first miners for at least a week
+// Todo: Nomination Bug
 public class LiquidityStakingGovernance : SmartContract
 {
     private const uint MaximumNominations = 4;
@@ -69,6 +72,13 @@ public class LiquidityStakingGovernance : SmartContract
         State.SetStruct($"Nomination:{rank}", nomination);
     }
     
+    public void SetController(Address newController)
+    {
+        Assert(Controller == Address.Zero || Message.Sender == Controller, "OPDEX: UNAUTHORIZED");
+
+        Controller = newController;
+    }
+    
     public void Initialize(byte[] stakingTokens)
     {
         Assert(Message.Sender == RewardToken);
@@ -79,37 +89,16 @@ public class LiquidityStakingGovernance : SmartContract
         
         Assert(tokens.Length == MaximumNominations);
 
-        foreach (var token in tokens)
-        {
-            Deploy(token);
-        }
+        foreach (var token in tokens) Deploy(token);
     }
-    
-    private Address Deploy(Address stakingToken)
-    {
-        var stakingContract = GetStakingContract(stakingToken);
 
-        if (stakingContract != Address.Zero) return stakingContract;
-
-        stakingContract = Create<LiquidityStaking>(0ul, new object[] { Address, RewardToken, stakingToken }).NewContractAddress;
-        
-        SetStakingContract(stakingToken, stakingContract);
-        
-        Log(new LiquidityStakingDeploymentEvent {Address = stakingContract});
-
-        return stakingContract;
-    }
-    
     public void NotifyRewardAmounts()
     {
         Assert(Block.Number > NominationPeriodEnd);
 
         var reward = BucketReward;
         
-        for (var i = 0U; i < MaximumNominations - 1; i++)
-        {
-            NotifyRewardAmountExecute(i, reward);
-        }
+        for (var i = 0U; i < MaximumNominations - 1; i++) NotifyRewardAmountExecute(i, reward);
 
         NominationPeriodEnd += TwoMonthsBlocks;
     }
@@ -130,13 +119,70 @@ public class LiquidityStakingGovernance : SmartContract
             if (nomination.Funded) continue;
             
             allFunded = false;
+            
             break;
         }
 
-        if (allFunded)
+        if (allFunded) NominationPeriodEnd += TwoMonthsBlocks;
+    }
+    
+    public void Nominate(Address stakingToken, UInt256 weight)
+    {
+        Assert(Message.Sender == Controller);
+
+        if (Block.Number <= NominationPeriodEnd) return;
+
+        const uint maxNominationIndex = MaximumNominations - 1;
+
+        for (var i = 0U; i < maxNominationIndex; i++)
         {
-            NominationPeriodEnd += TwoMonthsBlocks;
+            var nomination = GetNomination(i);
+
+            // Todo: Bug, if someone votes twice with the same weight it'll include duplicate nominations, need to also check the address 
+            if (weight <= nomination.Weight) continue;
+            
+            var stakingAddress = Deploy(stakingToken);
+            
+            var newNomination = new Nomination { Weight = weight, StakingAddress = stakingAddress };
+
+            for (var n = maxNominationIndex; n > i; n--) SetNomination(GetNomination(n - 1), n);
+            
+            SetNomination(newNomination, i);
+            
+            Log(new NominationEvent { StakingToken = stakingToken, Weight = weight, StakingAddress = stakingAddress }); 
+
+            break;
         }
+    }
+    
+    private Address Deploy(Address stakingToken)
+    {
+        var stakingContract = GetStakingContract(stakingToken);
+
+        if (stakingContract != Address.Zero) return stakingContract;
+
+        stakingContract = Create<LiquidityStaking>(0ul, new object[] { Address, RewardToken, stakingToken }).NewContractAddress;
+        
+        SetStakingContract(stakingToken, stakingContract);
+        
+        Log(new LiquidityStakingDeploymentEvent { Address = stakingContract });
+
+        return stakingContract;
+    }
+
+    private void SetBucketReward()
+    {
+        var bucketIndex = BucketIndex;
+
+        if (bucketIndex > 0) BucketIndex = 0;
+        
+        var factoryBalance = (UInt256)Call(RewardToken, 0ul, "GetBalance", new object[] {Address}).ReturnValue;
+        
+        Assert(factoryBalance > UInt256.Zero, "INVALID_BALANCE");
+
+        var bucketReward = factoryBalance / ContractsPerYear;
+        
+        BucketReward = bucketReward;
     }
 
     private void NotifyRewardAmountExecute(uint index, UInt256 reward)
@@ -147,83 +193,15 @@ public class LiquidityStakingGovernance : SmartContract
         
         SafeTransferTo(RewardToken, nomination.StakingAddress, reward);
 
-        var result = Call(nomination.StakingAddress, 0, "NotifyRewardAmount");
-        Assert(result.Success);
+        Assert(Call(nomination.StakingAddress, 0, "NotifyRewardAmount").Success);
         
         nomination.Funded = true;
+        
         SetNomination(nomination, index);
 
-        if (BucketIndex++ == MaximumNominations)
-        {
-            SetBucketReward();
-        }
+        if (BucketIndex++ == MaximumNominations) SetBucketReward();
     }
 
-    public void Nominate(Address stakingToken, UInt256 weight)
-    {
-        Assert(Message.Sender == Controller);
-
-        if (Block.Number <= NominationPeriodEnd)
-        {
-            return;
-        }
-
-        const uint maxNominationIndex = MaximumNominations - 1;
-
-        for (var i = 0U; i < maxNominationIndex; i++)
-        {
-            var nomination = GetNomination(i);
-
-            // Todo: Bug, if someone votes twice with the same weight it'll include duplicate nominations
-            // Need to also check the address 
-            if (weight <= nomination.Weight)
-            {
-                continue;
-            }
-            
-            var stakingAddress = Deploy(stakingToken);
-            
-            var newNomination = new Nomination { Weight = weight, StakingAddress = stakingAddress };
-
-            for (var n = maxNominationIndex; n > i; n--)
-            {
-                SetNomination(GetNomination(n - 1), n);
-            }
-            
-            SetNomination(newNomination, i);
-            
-            Log(new NominationEvent { StakingToken = stakingToken, Weight = weight, StakingAddress = stakingAddress }); 
-
-            break;
-        }
-    }
-
-    private void SetBucketReward()
-    {
-        var bucketIndex = BucketIndex;
-
-        if (bucketIndex > 0)
-        {
-            BucketIndex = 0;
-        }
-        
-        var balanceResponse = Call(RewardToken, 0ul, "GetBalance", new object[] {Address});
-        var factoryBalance = (UInt256)balanceResponse.ReturnValue;
-        
-        Assert(factoryBalance > UInt256.Zero, "INVALID_BALANCE");
-
-        var bucketReward = factoryBalance / ContractsPerYear;
-        
-        BucketReward = bucketReward;
-    }
-    
-    public void SetController(Address newController)
-    {
-        Assert(Controller == Address.Zero || Message.Sender == Controller, "OPDEX: UNAUTHORIZED");
-
-        Controller = newController;
-    }
-    
     private void SafeTransferTo(Address token, Address to, UInt256 amount)
     {
         if (amount == 0) return;
