@@ -3,14 +3,14 @@ using Stratis.SmartContracts;
 // Todo: Initial setting and enforcement of NominationPeriodEnd
 // Todo: Initial deploy restrict first miners for at least a week
 // Todo: Nomination Bug
-public class LiquidityStakingGovernance : SmartContract
+public class MiningGovernance : SmartContract
 {
     private const uint MaximumNominations = 4;
     private const uint BlocksPerYear = 1_971_000;
     private const uint TwoMonthsBlocks = 328_500; // Blocks pr year / 6
     private const uint ContractsPerYear = 24; // 4 concurrent mining contracts, 2 months each
         
-    public LiquidityStakingGovernance(ISmartContractState contractState, Address rewardToken) : base(contractState)
+    public MiningGovernance(ISmartContractState contractState, Address rewardToken) : base(contractState)
     {
         Genesis = Block.Number;
         RewardToken = rewardToken;
@@ -162,7 +162,7 @@ public class LiquidityStakingGovernance : SmartContract
 
         if (stakingContract != Address.Zero) return stakingContract;
 
-        stakingContract = Create<LiquidityStaking>(0ul, new object[] { Address, RewardToken, stakingToken }).NewContractAddress;
+        stakingContract = Create<Mining>(0ul, new object[] { Address, RewardToken, stakingToken }).NewContractAddress;
         
         SetStakingContract(stakingToken, stakingContract);
         

@@ -7,12 +7,12 @@ using Xunit;
 
 namespace OpdexTokenTests
 {
-    public class LiquidityStakingTests : TestBase
+    public class MiningTests : TestBase
     {
         [Fact]
         public void CreatesContract_Success()
         {
-            var staking = CreateNewLiquidityStaking();
+            var staking = CreateNewMining();
 
             staking.RewardsDistribution.Should().Be(Factory);
             staking.RewardsToken.Should().Be(OPDX);
@@ -31,7 +31,7 @@ namespace OpdexTokenTests
         {
             PersistentState.SetUInt64("PeriodFinish", periodFinish);
 
-            var staking = CreateNewLiquidityStaking(currentBlock);
+            var staking = CreateNewMining(currentBlock);
 
             staking.LastTimeRewardApplicable().Should().Be(expected);
         }
@@ -50,7 +50,7 @@ namespace OpdexTokenTests
             PersistentState.SetUInt64("LastUpdateTime", lastUpdateTime);
             PersistentState.SetUInt64("PeriodFinish", periodFinish);
 
-            var staking = CreateNewLiquidityStaking(periodStart);
+            var staking = CreateNewMining(periodStart);
 
             SetupBlock(currentBlock);
 
@@ -78,7 +78,7 @@ namespace OpdexTokenTests
             PersistentState.SetUInt256($"UserRewardPerTokenPaid:{Miner}", UInt256.Zero);
             PersistentState.SetUInt256($"Reward:{Miner}", UInt256.Zero);
 
-            var staking = CreateNewLiquidityStaking(periodStart);
+            var staking = CreateNewMining(periodStart);
 
             SetupBlock(currentBlock);
 
@@ -103,7 +103,7 @@ namespace OpdexTokenTests
             var transferParams = new object[] { Miner, MiningContract, amount };
             SetupCall(Pair, 0ul, "TransferFrom", transferParams, TransferResult.Transferred(true));
             
-            var staking = CreateNewLiquidityStaking(periodStart);
+            var staking = CreateNewMining(periodStart);
 
             SetupBlock(currentBlock);
             SetupMessage(MiningContract, Miner);
@@ -116,7 +116,7 @@ namespace OpdexTokenTests
             staking.GetUserRewardPerTokenPaid(Miner).Should().Be(userRewardPerTokenPaid);
 
             VerifyCall(Pair, 0ul, "TransferFrom", transferParams, Times.Once);
-            VerifyLog(new LiquidityStaking.StakedEvent { User = Miner, Amount = amount }, Times.Once);
+            VerifyLog(new Mining.StakedEvent { User = Miner, Amount = amount }, Times.Once);
         }
 
         [Theory]
@@ -134,7 +134,7 @@ namespace OpdexTokenTests
             var transferParams = new object[] { Miner, MiningContract, amount };
             SetupCall(Pair, 0ul, "TransferFrom", transferParams, TransferResult.Transferred(true));
             
-            var staking = CreateNewLiquidityStaking(periodStart);
+            var staking = CreateNewMining(periodStart);
 
             SetupBlock(currentBlock);
             SetupMessage(MiningContract, Miner);
@@ -149,7 +149,7 @@ namespace OpdexTokenTests
             staking.GetBalance(Miner).Should().Be(UInt256.Zero);
             
             VerifyCall(Pair, 0ul, "TransferTo", transferToParams, Times.Once);
-            VerifyLog(new LiquidityStaking.WithdrawnEvent { User = Miner, Amount = amount }, Times.Once);
+            VerifyLog(new Mining.WithdrawnEvent { User = Miner, Amount = amount }, Times.Once);
         }
 
         [Theory]
@@ -167,7 +167,7 @@ namespace OpdexTokenTests
             var transferParams = new object[] { Miner, MiningContract, amount };
             SetupCall(Pair, 0ul, "TransferFrom", transferParams, TransferResult.Transferred(true));
             
-            var staking = CreateNewLiquidityStaking(periodStart);
+            var staking = CreateNewMining(periodStart);
 
             SetupBlock(currentBlock);
             SetupMessage(MiningContract, Miner);
@@ -187,7 +187,7 @@ namespace OpdexTokenTests
             staking.GetReward();
             
             VerifyCall(OPDX, 0ul, "TransferTo", transferToRewardParams, Times.Once);
-            VerifyLog(new LiquidityStaking.RewardPaidEvent { User = Miner, Reward = reward }, Times.Once);
+            VerifyLog(new Mining.RewardPaidEvent { User = Miner, Reward = reward }, Times.Once);
         }
 
         [Fact]

@@ -7,7 +7,7 @@ using Xunit;
 
 namespace OpdexTokenTests
 {
-    public class LiquidityStakingGovernanceTests : TestBase
+    public class MiningGovernanceTests : TestBase
     {
         [Fact]
         public void CreatesContract_Success()

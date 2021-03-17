@@ -1,8 +1,8 @@
 using Stratis.SmartContracts;
 
-public class LiquidityStaking : SmartContract
+public class Mining : SmartContract
 {
-    public LiquidityStaking(ISmartContractState contractState, Address rewardsDistribution, Address rewardsToken, Address stakingToken) 
+    public Mining(ISmartContractState contractState, Address rewardsDistribution, Address rewardsToken, Address stakingToken) 
         : base(contractState)
     {
         RewardsDistribution = rewardsDistribution;

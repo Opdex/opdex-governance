@@ -71,7 +71,7 @@ public class OpdexToken : StandardToken, IStandardToken256
         
         if (index == 0) return genesis;
         
-        return BlocksPerYear * index + genesis;
+        return (BlocksPerYear * index) + genesis;
     }
     
     public void Distribute(byte[] stakingTokens)
@@ -83,11 +83,11 @@ public class OpdexToken : StandardToken, IStandardToken256
         var miningSchedule = MiningSchedule;
         var inflationIndex = InflationIndex;
 
-        Assert(Block.Number < GetBlockForYearIndex(yearIndex), "TOO_EARLY");
+        Assert(Block.Number >= GetBlockForYearIndex(yearIndex), "TOO_EARLY");
 
         if (miningGov == Address.Zero)
         {
-            miningGov = Create<LiquidityStakingGovernance>(0ul, new object [] { Address }).NewContractAddress;
+            miningGov = Create<MiningGovernance>(0ul, new object [] { Address }).NewContractAddress;
             MiningGovernance = miningGov;
         }
 
@@ -101,7 +101,7 @@ public class OpdexToken : StandardToken, IStandardToken256
 
         if (yearIndex == 0)
         {
-            Call(MiningGovernance, 0ul, "Initialize", new object[] {stakingTokens});
+            Assert(Call(MiningGovernance, 0ul, "Initialize", new object[] {stakingTokens}).Success);
         }
         
         TotalSupply += supplyIncrease;

@@ -56,23 +56,24 @@ namespace OpdexTokenTests.Base
         //     return new OpdexMining(_mockContractState.Object, Pair, amountToDistribute, duration);
         // }
         
-        protected OpdexToken CreateNewOpdexToken(ulong block = 10)
+        protected OpdexToken CreateNewOpdexToken(byte[]ownerSchedule, byte[] miningSchedule, ulong block = 10)
         {
             _mockContractState.Setup(x => x.Message).Returns(new Message(OPDX, Owner, 0));
+            
             SetupBalance(0);
             SetupBlock(block);
-            SetupCreate<LiquidityStakingGovernance>(CreateResult.Succeeded(Factory), 0ul, new object[] { OPDX });
             
-            return new OpdexToken(_mockContractState.Object, "Opdex", "OPDX", 8, new byte[0], new byte[0]);
+            return new OpdexToken(_mockContractState.Object, "Opdex", "OPDX", 18, ownerSchedule, miningSchedule);
         }
 
-        protected LiquidityStaking CreateNewLiquidityStaking(ulong block = 10)
+        protected Mining CreateNewMining(ulong block = 10)
         {
             _mockContractState.Setup(x => x.Message).Returns(new Message(MiningContract, OPDX, 0));
-            SetupBlock(block);
-            SetupBalance(0);
             
-            return new LiquidityStaking(_mockContractState.Object, Factory, OPDX, Pair);
+            SetupBalance(0);
+            SetupBlock(block);
+            
+            return new Mining(_mockContractState.Object, Factory, OPDX, Pair);
         }
 
         protected void SetupMessage(Address contractAddress, Address sender, ulong value = 0)
@@ -135,6 +136,11 @@ namespace OpdexTokenTests.Base
         protected void VerifyTransfer(Address to, ulong value, Func<Times> times)
         {
             _mockInternalExecutor.Verify(x => x.Transfer(_mockContractState.Object, to, value), times);
+        }
+
+        protected void VerifyCreate<T>(ulong amountToTransfer, object[] createParams, Func<Times> times)
+        {
+            _mockInternalExecutor.Verify(x => x.Create<T>(_mockContractState.Object, amountToTransfer, createParams, 0ul), times);
         }
 
         protected void VerifyLog<T>(T expectedLog, Func<Times> times)
