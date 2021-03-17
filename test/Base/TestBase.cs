@@ -63,7 +63,7 @@ namespace OpdexTokenTests.Base
             SetupBlock(block);
             SetupCreate<LiquidityStakingGovernance>(CreateResult.Succeeded(Factory), 0ul, new object[] { OPDX });
             
-            return new OpdexToken(_mockContractState.Object, "Opdex", "OPDX", 8);
+            return new OpdexToken(_mockContractState.Object, "Opdex", "OPDX", 8, new byte[0], new byte[0]);
         }
 
         protected LiquidityStaking CreateNewLiquidityStaking(ulong block = 10)

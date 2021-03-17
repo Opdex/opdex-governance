@@ -72,11 +72,12 @@ public class LiquidityStakingGovernance : SmartContract
         State.SetStruct($"Nomination:{rank}", nomination);
     }
     
-    public void SetController(Address newController)
+    public void SetController(Address address)
     {
         Assert(Controller == Address.Zero || Message.Sender == Controller, "OPDEX: UNAUTHORIZED");
+        Assert(State.IsContract(address), "OPDEX: INVALID_CONTROLLER");
 
-        Controller = newController;
+        Controller = address;
     }
     
     public void Initialize(byte[] stakingTokens)
