@@ -1,6 +1,6 @@
 using Stratis.SmartContracts;
 
-public class Mining : SmartContract
+public class Mining : BaseContract
 {
     public Mining(ISmartContractState contractState, Address rewardsDistribution, Address rewardsToken, Address stakingToken) 
         : base(contractState)

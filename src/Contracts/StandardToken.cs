@@ -3,12 +3,11 @@ using Stratis.SmartContracts.Standards;
 
 /// <summary>
 /// Constructor used to create a new instance of the token. Assigns the total token supply to the creator of the contract.
-/// <param name="totalSupply">The total token supply.</param>
 /// <param name="name">The name of the token.</param>
 /// <param name="symbol">The symbol used to identify the token.</param>
 /// <param name="decimals">The amount of decimals for display and calculation purposes.</param>
 /// </summary>
-public abstract class StandardToken : SmartContract, IStandardToken256
+public class StandardToken : BaseContract, IStandardToken256
 {
     protected StandardToken(ISmartContractState contractState, string name, string symbol, byte decimals) 
         : base(contractState) 
@@ -16,8 +15,6 @@ public abstract class StandardToken : SmartContract, IStandardToken256
         this.Name = name;
         this.Symbol = symbol;
         this.Decimals = decimals;
-        // this.TotalSupply = totalSupply;
-        // this.SetBalance(Message.Sender, totalSupply);
     }
     
     public string Symbol

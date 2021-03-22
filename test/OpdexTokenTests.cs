@@ -30,7 +30,6 @@ namespace OpdexTokenTests
             token.GetBalance(Factory).Should().Be(UInt256.Zero);
             token.OwnerSchedule.Should().Equal(DefaultOwnerSchedule);
             token.MiningSchedule.Should().Equal(DefaultMiningSchedule);
-            token.InflationIndex.Should().Be((uint)DefaultOwnerSchedule.Length - 1);
         }
 
         [Fact]
@@ -125,7 +124,7 @@ namespace OpdexTokenTests
 
             VerifyCreate<MiningGovernance>(0ul, createParams, Times.Once);
             VerifyCall(MiningContract, 0ul, "Initialize", callParams, Times.Once);
-            VerifyLog(new OpdexToken.DistributionEvent
+            VerifyLog(new DistributionEvent
             {
                 OwnerAddress = Owner,
                 MiningAddress = MiningContract,
@@ -141,6 +140,7 @@ namespace OpdexTokenTests
         [InlineData(3, 270_000_000, 630_000_000, 900_000_000, 300_000_000, 700_000_000, 1_000_000_000)]
         [InlineData(4, 300_000_000, 700_000_000, 1_000_000_000, 307_500_000, 717_500_000, 1_025_000_000)]
         [InlineData(5, 307_500_000, 717_500_000, 1_025_000_000, 315_000_000, 735_000_000, 1_050_000_000)]
+        [InlineData(6, 315_000_000, 735_000_000, 1_050_000_000, 322_500_000, 752_500_000, 1_075_000_000)]
         public void Distribute_SubsequentYears_Success(uint yearIndex, UInt256 currentOwnerBalance, UInt256 currentMiningBalance, UInt256 currentTotalSupply,
             UInt256 expectedOwnerBalance, UInt256 expectedMiningBalance, UInt256 expectedTotalSupply)
         {
@@ -169,7 +169,7 @@ namespace OpdexTokenTests
                 ? (uint) DefaultOwnerSchedule.Length - 1
                 : yearIndex;
             
-            VerifyLog(new OpdexToken.DistributionEvent
+            VerifyLog(new DistributionEvent
             {
                 OwnerAddress = Owner,
                 MiningAddress = MiningContract,

@@ -1,8 +1,8 @@
-﻿using Stratis.SmartContracts;
-using Stratis.SmartContracts.Standards;
+﻿using System;
+using Stratis.SmartContracts;
 
 [Deploy]
-public class OpdexToken : StandardToken, IStandardToken256
+public class OpdexToken : StandardToken
 {
     private const ulong BlocksPerYear = 1_971_000; // based on 16 second blocks
     
@@ -14,13 +14,13 @@ public class OpdexToken : StandardToken, IStandardToken256
         var ownerLength = (uint)ownerSchedule.Length;
         var miningLength = (uint)miningSchedule.Length;
         
-        Assert(ownerLength > 1 &&  miningLength > 1 && ownerLength == miningLength);
+        Assert(ownerLength > 1 && miningLength > 1 && ownerLength == miningLength);
 
         Owner = Message.Sender;
         Genesis = Block.Number;
         OwnerSchedule = ownerSchedule;
         MiningSchedule = miningSchedule;
-        InflationIndex = ownerLength - 1;
+        CreateMiningGovernanceContract();
     }
 
     public Address Owner
@@ -52,12 +52,6 @@ public class OpdexToken : StandardToken, IStandardToken256
         get => State.GetUInt64(nameof(Genesis));
         private set => State.SetUInt64(nameof(Genesis), value);
     }
-    
-    public uint InflationIndex
-    {
-        get => State.GetUInt32(nameof(InflationIndex));
-        private set => State.SetUInt32(nameof(InflationIndex), value);
-    }
 
     public uint YearIndex
     {
@@ -65,13 +59,19 @@ public class OpdexToken : StandardToken, IStandardToken256
         private set => State.SetUInt32(nameof(YearIndex), value);
     }
 
-    private ulong GetBlockForYearIndex(uint index)
+    // Todo: Test and consider the scenario where the MiningGovernance address needs to change
+    // The change could be for security or new versioning reasons, a change in the middle of 
+    // the year would break mining. Current implementation would only work if the change is 
+    // done in between yearly distribution periods.
+    //
+    // Consider, on updating MiningGovernance address, hold a temporary value that gets updated
+    // during the yearly called Distribute method. Downside is it still takes a year to implement
+    // an updated MiningGovernance contract if ever necessary. Other option is updating immediately
+    // and moving funds from old miner to new miner. 
+    public void Nominate()
     {
-        var genesis = Genesis;
-        
-        if (index == 0) return genesis;
-        
-        return (BlocksPerYear * index) + genesis;
+        var nominationParams = new object[] {Message.Sender, GetBalance(Message.Sender)};
+        Call(MiningGovernance, 0ul, nameof(Nominate), nominationParams);
     }
     
     public void Distribute(byte[] stakingTokens)
@@ -81,15 +81,9 @@ public class OpdexToken : StandardToken, IStandardToken256
         var owner = Owner;
         var ownerSchedule = OwnerSchedule;
         var miningSchedule = MiningSchedule;
-        var inflationIndex = InflationIndex;
+        var inflationIndex = (uint)ownerSchedule.Length - 1;
 
         Assert(Block.Number >= GetBlockForYearIndex(yearIndex), "TOO_EARLY");
-
-        if (miningGov == Address.Zero)
-        {
-            miningGov = Create<MiningGovernance>(0ul, new object [] { Address }).NewContractAddress;
-            MiningGovernance = miningGov;
-        }
 
         var scheduleIndex = yearIndex < inflationIndex ? yearIndex : inflationIndex;
         var ownerTokens = ownerSchedule[scheduleIndex];
@@ -99,6 +93,7 @@ public class OpdexToken : StandardToken, IStandardToken256
         SetBalance(owner, GetBalance(owner) + ownerTokens);
         SetBalance(miningGov, GetBalance(miningGov) + miningTokens);
 
+        // Todo: Get this out of here
         if (yearIndex == 0)
         {
             Assert(Call(MiningGovernance, 0ul, "Initialize", new object[] {stakingTokens}).Success);
@@ -125,19 +120,32 @@ public class OpdexToken : StandardToken, IStandardToken256
         
         Log(new OwnerChangeEvent { From = Message.Sender, To = owner });
     }
-
-    public struct DistributionEvent
+    
+    public void SetMiningGovernance(Address miningGovernance)
     {
-        [Index] public Address OwnerAddress;
-        [Index] public Address MiningAddress;
-        public UInt256 OwnerAmount;
-        public UInt256 MiningAmount;
-        public uint YearIndex;
+        Assert(Message.Sender == Owner, "UNAUTHORIZED");
+        Assert(State.IsContract(miningGovernance));
+
+        Log(new MiningGovernanceChangeEvent { From = MiningGovernance, To = miningGovernance });
+        
+        MiningGovernance = miningGovernance;
     }
 
-    public struct OwnerChangeEvent
+    private void CreateMiningGovernanceContract()
     {
-        [Index] public Address From;
-        [Index] public Address To;
+        var miningGovernance = Create<MiningGovernance>(0ul, new object [] { Address }).NewContractAddress;
+
+        MiningGovernance = miningGovernance;
+        
+        Log(new MiningGovernanceChangeEvent { From = Address.Zero, To = miningGovernance });
+    }
+
+    private ulong GetBlockForYearIndex(uint index)
+    {
+        var genesis = Genesis;
+        
+        if (index == 0) return genesis;
+        
+        return (BlocksPerYear * index) + genesis;
     }
 }
