@@ -1,5 +1,4 @@
-﻿using System;
-using Stratis.SmartContracts;
+﻿using Stratis.SmartContracts;
 
 [Deploy]
 public class OpdexToken : StandardToken
@@ -58,23 +57,15 @@ public class OpdexToken : StandardToken
         get => State.GetUInt32(nameof(YearIndex));
         private set => State.SetUInt32(nameof(YearIndex), value);
     }
-
-    // Todo: Test and consider the scenario where the MiningGovernance address needs to change
-    // The change could be for security or new versioning reasons, a change in the middle of 
-    // the year would break mining. Current implementation would only work if the change is 
-    // done in between yearly distribution periods.
-    //
-    // Consider, on updating MiningGovernance address, hold a temporary value that gets updated
-    // during the yearly called Distribute method. Downside is it still takes a year to implement
-    // an updated MiningGovernance contract if ever necessary. Other option is updating immediately
-    // and moving funds from old miner to new miner. 
+    
     public void Nominate()
     {
+        Assert(State.IsContract(Message.Sender));
         var nominationParams = new object[] {Message.Sender, GetBalance(Message.Sender)};
         Call(MiningGovernance, 0ul, nameof(Nominate), nominationParams);
     }
     
-    public void Distribute(byte[] stakingTokens)
+    public void Distribute(byte[] data)
     {
         var yearIndex = YearIndex;
         var miningGov = MiningGovernance;
@@ -93,10 +84,9 @@ public class OpdexToken : StandardToken
         SetBalance(owner, GetBalance(owner) + ownerTokens);
         SetBalance(miningGov, GetBalance(miningGov) + miningTokens);
 
-        // Todo: Get this out of here
         if (yearIndex == 0)
         {
-            Assert(Call(MiningGovernance, 0ul, "Initialize", new object[] {stakingTokens}).Success);
+            Assert(Call(miningGov, 0ul, "Initialize", new object[] {data}).Success);
         }
         
         TotalSupply += supplyIncrease;
@@ -114,21 +104,11 @@ public class OpdexToken : StandardToken
 
     public void SetOwner(Address owner)
     {
-        Assert(Message.Sender == Owner, "UNAUTHORIZED");
+        Assert(Message.Sender == Owner, "OPDEX: UNAUTHORIZED");
         
         Owner = owner;
         
         Log(new OwnerChangeEvent { From = Message.Sender, To = owner });
-    }
-    
-    public void SetMiningGovernance(Address miningGovernance)
-    {
-        Assert(Message.Sender == Owner, "UNAUTHORIZED");
-        Assert(State.IsContract(miningGovernance));
-
-        Log(new MiningGovernanceChangeEvent { From = MiningGovernance, To = miningGovernance });
-        
-        MiningGovernance = miningGovernance;
     }
 
     private void CreateMiningGovernanceContract()
@@ -142,10 +122,8 @@ public class OpdexToken : StandardToken
 
     private ulong GetBlockForYearIndex(uint index)
     {
-        var genesis = Genesis;
+        if (index == 0) return Genesis;
         
-        if (index == 0) return genesis;
-        
-        return (BlocksPerYear * index) + genesis;
+        return (BlocksPerYear * index) + Genesis;
     }
 }

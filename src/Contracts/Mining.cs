@@ -65,40 +65,28 @@ public class Mining : BaseContract
         private set => State.SetUInt256(nameof(TotalSupply), value);
     }
 
-    public UInt256 GetUserRewardPerTokenPaid(Address user)
-    {
-        return State.GetUInt256($"UserRewardPerTokenPaid:{user}");
-    }
+    public UInt256 GetUserRewardPerTokenPaid(Address user) 
+        => State.GetUInt256($"UserRewardPerTokenPaid:{user}");
 
     private void SetUserRewardPerTokenPaid(Address user, UInt256 reward)
-    {
-        State.SetUInt256($"UserRewardPerTokenPaid:{user}", reward);
-    }
+        => State.SetUInt256($"UserRewardPerTokenPaid:{user}", reward);
     
     public UInt256 GetReward(Address user)
-    {
-        return State.GetUInt256($"Reward:{user}");
-    }
+        => State.GetUInt256($"Reward:{user}");
 
     private void SetReward(Address user, UInt256 reward)
-    {
-        State.SetUInt256($"Rewards:{user}", reward);
-    }
+        => State.SetUInt256($"Rewards:{user}", reward);
     
     public UInt256 GetBalance(Address user)
-    {
-        return State.GetUInt256($"Balance:{user}");
-    }
+        => State.GetUInt256($"Balance:{user}");
 
     private void SetBalance(Address user, UInt256 reward)
-    {
-        State.SetUInt256($"Balance:{user}", reward);
-    }
+        => State.SetUInt256($"Balance:{user}", reward);
 
     public ulong LastTimeRewardApplicable()
-    {
-        return Block.Number > PeriodFinish ? PeriodFinish : Block.Number;
-    }
+        => Block.Number > PeriodFinish ? PeriodFinish : Block.Number;
+    
+    public UInt256 GetRewardForDuration() => RewardRate * RewardsDuration;
 
     public UInt256 RewardPerToken()
     {
@@ -122,11 +110,6 @@ public class Mining : BaseContract
         return balance * remainingReward / 100_000_000 + reward;
     }
 
-    public UInt256 GetRewardForDuration()
-    {
-        return RewardRate * RewardsDuration;
-    }
-    
     public void Stake(UInt256 amount)
     {
         UpdateReward(Message.Sender);
