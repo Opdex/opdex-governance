@@ -1,8 +1,8 @@
 using Stratis.SmartContracts;
 
-public struct NominationEvent
+public struct MiningPoolRewardedEvent
 {
     [Index] public Address StakingPool;
     [Index] public Address MiningPool;
-    public UInt256 Weight;
+    public UInt256 Amount;
 }

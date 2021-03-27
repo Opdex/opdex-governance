@@ -1,8 +1,8 @@
 using Stratis.SmartContracts;
 
-public class Mining : BaseContract
+public class MiningPool : BaseContract, IMiningPool
 {
-    public Mining(ISmartContractState contractState, Address rewardsDistribution, Address rewardsToken, Address stakingToken) 
+    public MiningPool(ISmartContractState contractState, Address rewardsDistribution, Address rewardsToken, Address stakingToken) 
         : base(contractState)
     {
         RewardsDistribution = rewardsDistribution;
@@ -110,7 +110,7 @@ public class Mining : BaseContract
         return balance * remainingReward / 100_000_000 + reward;
     }
 
-    public void Stake(UInt256 amount)
+    public void Mine(UInt256 amount)
     {
         UpdateReward(Message.Sender);
         
@@ -156,7 +156,7 @@ public class Mining : BaseContract
         }
     }
 
-    public void Exit()
+    public void ExitMining()
     {
         Withdraw(GetBalance(Message.Sender));
         

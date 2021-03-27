@@ -14,12 +14,22 @@ namespace OpdexTokenTests.Base
         private readonly Mock<IContractLogger> _mockContractLogger;
         private readonly Mock<IInternalTransactionExecutor> _mockInternalExecutor;
         protected readonly ISerializer Serializer;
-        protected readonly Address MiningContract;
-        protected readonly Address Pair;
         protected readonly Address OPDX;
-        protected readonly Address Miner;
-        protected readonly Address Factory;
+        protected readonly Address MiningGovernance;
+        protected readonly Address MiningPool1;
+        protected readonly Address MiningPool2;
+        protected readonly Address MiningPool3;
+        protected readonly Address MiningPool4;
+        protected readonly Address MiningPool5;
         protected readonly Address Owner;
+        protected readonly Address Miner1;
+        protected readonly Address Miner2;
+        protected readonly Address Miner3;
+        protected readonly Address Pool1;
+        protected readonly Address Pool2;
+        protected readonly Address Pool3;
+        protected readonly Address Pool4;
+        protected readonly Address Pool5;
         protected readonly InMemoryState PersistentState;
 
         protected TestBase()
@@ -33,28 +43,33 @@ namespace OpdexTokenTests.Base
             _mockContractState.Setup(x => x.ContractLogger).Returns(_mockContractLogger.Object);
             _mockContractState.Setup(x => x.InternalTransactionExecutor).Returns(_mockInternalExecutor.Object);
             _mockContractState.Setup(x => x.Serializer).Returns(Serializer);
-            MiningContract = "0x0000000000000000000000000000000000000001".HexToAddress();
-            Pair = "0x0000000000000000000000000000000000000002".HexToAddress();
-            OPDX = "0x0000000000000000000000000000000000000003".HexToAddress();
-            Miner = "0x0000000000000000000000000000000000000004".HexToAddress();
-            Factory = "0x0000000000000000000000000000000000000005".HexToAddress();
-            Owner = "0x0000000000000000000000000000000000000006".HexToAddress();
+            OPDX = "0x0000000000000000000000000000000000000001".HexToAddress();
+            MiningGovernance = "0x0000000000000000000000000000000000000002".HexToAddress();
+            MiningPool1 = "0x0000000000000000000000000000000000000003".HexToAddress();
+            MiningPool2 = "0x0000000000000000000000000000000000000004".HexToAddress();
+            MiningPool3 = "0x0000000000000000000000000000000000000005".HexToAddress();
+            MiningPool4 = "0x0000000000000000000000000000000000000006".HexToAddress();
+            MiningPool5 = "0x0000000000000000000000000000000000000007".HexToAddress();
+            Owner = "0x0000000000000000000000000000000000000008".HexToAddress();
+            Miner1 = "0x0000000000000000000000000000000000000009".HexToAddress();
+            Miner2 = "0x0000000000000000000000000000000000000010".HexToAddress();
+            Miner3 = "0x0000000000000000000000000000000000000011".HexToAddress();
+            Pool1 = "0x0000000000000000000000000000000000000012".HexToAddress();
+            Pool2 = "0x0000000000000000000000000000000000000013".HexToAddress();
+            Pool3 = "0x0000000000000000000000000000000000000014".HexToAddress();
+            Pool4 = "0x0000000000000000000000000000000000000015".HexToAddress();
+            Pool5 = "0x0000000000000000000000000000000000000016".HexToAddress();
         }
 
-        // protected OpdexMining CreateNewOpdexMiner(UInt256 amountToDistribute, ulong duration = 100)
-        // {
-        //     if (amountToDistribute == 0)
-        //     {
-        //         amountToDistribute = 20_000_000_000_000_000; // 200 million
-        //     }
-        //     
-        //     _mockContractState.Setup(x => x.Message).Returns(new Message(MiningContract, OPDX, 0));
-        //     _mockContractState.Setup(x => x.Block.Number).Returns(() => 10);
-        //     
-        //     SetupBalance(0);
-        //     
-        //     return new OpdexMining(_mockContractState.Object, Pair, amountToDistribute, duration);
-        // }
+        protected MiningGovernance CreateNewOpdexMiningGovernance(ulong block = 10)
+        {
+            _mockContractState.Setup(x => x.Message).Returns(new Message(MiningGovernance, OPDX, 0));
+            _mockContractState.Setup(x => x.Block.Number).Returns(() => block);
+            
+            SetupBalance(0);
+            
+            return new MiningGovernance(_mockContractState.Object, OPDX);
+        }
         
         protected OpdexToken CreateNewOpdexToken(byte[]ownerSchedule, byte[] miningSchedule, ulong block = 10)
         {
@@ -62,18 +77,19 @@ namespace OpdexTokenTests.Base
             
             SetupBalance(0);
             SetupBlock(block);
+            SetupCreate<MiningGovernance>(CreateResult.Succeeded(MiningGovernance), 0ul, new object[] {OPDX});
             
             return new OpdexToken(_mockContractState.Object, "Opdex", "OPDX", 18, ownerSchedule, miningSchedule);
         }
 
-        protected Mining CreateNewMining(ulong block = 10)
+        protected MiningPool CreateNewMiningPool(ulong block = 10)
         {
-            _mockContractState.Setup(x => x.Message).Returns(new Message(MiningContract, OPDX, 0));
+            _mockContractState.Setup(x => x.Message).Returns(new Message(MiningPool1, OPDX, 0));
             
             SetupBalance(0);
             SetupBlock(block);
             
-            return new Mining(_mockContractState.Object, Factory, OPDX, Pair);
+            return new MiningPool(_mockContractState.Object, MiningGovernance, OPDX, Pool1);
         }
 
         protected void SetupMessage(Address contractAddress, Address sender, ulong value = 0)

@@ -10,8 +10,8 @@ public class OpdexToken : StandardToken
     {
         var ownerSchedule = Serializer.ToArray<UInt256>(ownerDistribution);
         var miningSchedule = Serializer.ToArray<UInt256>(miningDistribution);
-        var ownerLength = (uint)ownerSchedule.Length;
-        var miningLength = (uint)miningSchedule.Length;
+        var ownerLength = ownerSchedule.Length;
+        var miningLength = miningSchedule.Length;
         
         Assert(ownerLength > 1 && miningLength > 1 && ownerLength == miningLength);
 
@@ -19,7 +19,7 @@ public class OpdexToken : StandardToken
         Genesis = Block.Number;
         OwnerSchedule = ownerSchedule;
         MiningSchedule = miningSchedule;
-        CreateMiningGovernanceContract();
+        MiningGovernance = Create<MiningGovernance>(0ul, new object[] {Address}).NewContractAddress;
     }
 
     public Address Owner
@@ -28,16 +28,16 @@ public class OpdexToken : StandardToken
         private set => State.SetAddress(nameof(Owner), value);
     }
     
-    public UInt256[] OwnerSchedule
-    {
-        get => State.GetArray<UInt256>(nameof(OwnerSchedule));
-        private set => State.SetArray(nameof(OwnerSchedule), value);
-    }
-    
     public Address MiningGovernance
     {
         get => State.GetAddress(nameof(MiningGovernance));
         private set => State.SetAddress(nameof(MiningGovernance), value);
+    }
+    
+    public UInt256[] OwnerSchedule
+    {
+        get => State.GetArray<UInt256>(nameof(OwnerSchedule));
+        private set => State.SetArray(nameof(OwnerSchedule), value);
     }
 
     public UInt256[] MiningSchedule
@@ -58,23 +58,30 @@ public class OpdexToken : StandardToken
         private set => State.SetUInt32(nameof(YearIndex), value);
     }
     
-    public void Nominate()
+    public void NominateLiquidityPool()
     {
         Assert(State.IsContract(Message.Sender));
-        var nominationParams = new object[] {Message.Sender, GetBalance(Message.Sender)};
-        Call(MiningGovernance, 0ul, nameof(Nominate), nominationParams);
+
+        var balance = GetBalance(Message.Sender);
+
+        if (balance == 0) return;
+        
+        Call(MiningGovernance, 0ul, nameof(NominateLiquidityPool), new object[] {Message.Sender, balance});
     }
     
     public void Distribute(byte[] data)
     {
         var yearIndex = YearIndex;
+        if (yearIndex == 0) Assert(Message.Sender == Owner);
+        
         var miningGov = MiningGovernance;
         var owner = Owner;
         var ownerSchedule = OwnerSchedule;
         var miningSchedule = MiningSchedule;
         var inflationIndex = (uint)ownerSchedule.Length - 1;
-
-        Assert(Block.Number >= GetBlockForYearIndex(yearIndex), "TOO_EARLY");
+        var minBlock = yearIndex == 0 ? Genesis : BlocksPerYear * yearIndex + Genesis;
+        
+        Assert(Block.Number >= minBlock, "OPDEX: DISTRIBUTION_NOT_READY");
 
         var scheduleIndex = yearIndex < inflationIndex ? yearIndex : inflationIndex;
         var ownerTokens = ownerSchedule[scheduleIndex];
@@ -84,11 +91,11 @@ public class OpdexToken : StandardToken
         SetBalance(owner, GetBalance(owner) + ownerTokens);
         SetBalance(miningGov, GetBalance(miningGov) + miningTokens);
 
-        if (yearIndex == 0)
-        {
-            Assert(Call(miningGov, 0ul, "Initialize", new object[] {data}).Success);
-        }
+        data = yearIndex == 0 ? data : new byte[0];
+        var notificationResponse = Call(miningGov, 0ul, "NotifyDistribution", new object[] {data});
         
+        Assert(notificationResponse.Success, "OPDEX: FAILED_DISTRIBUTION_NOTIFICATION");
+
         TotalSupply += supplyIncrease;
         YearIndex++;
         
@@ -109,21 +116,5 @@ public class OpdexToken : StandardToken
         Owner = owner;
         
         Log(new OwnerChangeEvent { From = Message.Sender, To = owner });
-    }
-
-    private void CreateMiningGovernanceContract()
-    {
-        var miningGovernance = Create<MiningGovernance>(0ul, new object [] { Address }).NewContractAddress;
-
-        MiningGovernance = miningGovernance;
-        
-        Log(new MiningGovernanceChangeEvent { From = Address.Zero, To = miningGovernance });
-    }
-
-    private ulong GetBlockForYearIndex(uint index)
-    {
-        if (index == 0) return Genesis;
-        
-        return (BlocksPerYear * index) + Genesis;
     }
 }

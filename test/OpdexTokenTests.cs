@@ -1,8 +1,10 @@
+using System;
 using FluentAssertions;
 using Moq;
 using OpdexTokenTests.Base;
 using Stratis.SmartContracts;
 using Stratis.SmartContracts.CLR;
+using Stratis.SmartContracts.Core;
 using Xunit;
 
 namespace OpdexTokenTests
@@ -27,7 +29,7 @@ namespace OpdexTokenTests
             token.Genesis.Should().Be(10ul);
             token.TotalSupply.Should().Be(UInt256.Zero);
             token.GetBalance(Owner).Should().Be(UInt256.Zero);
-            token.GetBalance(Factory).Should().Be(UInt256.Zero);
+            token.GetBalance(MiningGovernance).Should().Be(UInt256.Zero);
             token.OwnerSchedule.Should().Equal(DefaultOwnerSchedule);
             token.MiningSchedule.Should().Equal(DefaultMiningSchedule);
         }
@@ -82,9 +84,9 @@ namespace OpdexTokenTests
             
             SetupMessage(OPDX, Owner);
             
-            token.SetOwner(MiningContract);
+            token.SetOwner(MiningGovernance);
 
-            token.Owner.Should().Be(MiningContract);
+            token.Owner.Should().Be(MiningGovernance);
         }
         
         [Fact]
@@ -95,11 +97,11 @@ namespace OpdexTokenTests
             
             var token = CreateNewOpdexToken(ownerSchedule, miningSchedule);
             
-            SetupMessage(OPDX, Miner);
+            SetupMessage(OPDX, Miner1);
 
-            token.Invoking(t => t.SetOwner(MiningContract))
+            token.Invoking(t => t.SetOwner(MiningGovernance))
                 .Should().Throw<SmartContractAssertException>()
-                .WithMessage("UNAUTHORIZED");
+                .WithMessage("OPDEX: UNAUTHORIZED");
         }
 
         [Fact]
@@ -107,27 +109,27 @@ namespace OpdexTokenTests
         {
             var token = CreateNewOpdexToken(Serializer.Serialize(DefaultOwnerSchedule), Serializer.Serialize(DefaultMiningSchedule));
 
-            var stakingTokens = Serializer.Serialize(new[] { Miner, Pair, OPDX, Owner }); // Any 4 address, not important for this test
+            var stakingTokens = Serializer.Serialize(new[] { Miner1, Pool1, OPDX, Owner }); // Any 4 address, not important for this test
 
             var createParams = new object[] { OPDX };
-            SetupCreate<MiningGovernance>(CreateResult.Succeeded(MiningContract), 0ul, createParams);
+            SetupCreate<MiningGovernance>(CreateResult.Succeeded(MiningGovernance), 0ul, createParams);
 
             var callParams = new object[] { stakingTokens };
-            SetupCall(MiningContract, 0ul, "Initialize", callParams, TransferResult.Transferred(null));
+            SetupCall(MiningGovernance, 0ul, nameof(IMiningGovernance.NotifyDistribution), callParams, TransferResult.Transferred(null));
             
             token.Distribute(stakingTokens);
             
             token.GetBalance(Owner).Should().Be(DefaultOwnerSchedule[0]);
-            token.GetBalance(MiningContract).Should().Be(DefaultMiningSchedule[0]);
+            token.GetBalance(MiningGovernance).Should().Be(DefaultMiningSchedule[0]);
             token.YearIndex.Should().Be(1);
             token.TotalSupply.Should().Be((UInt256)400_000_000);
 
             VerifyCreate<MiningGovernance>(0ul, createParams, Times.Once);
-            VerifyCall(MiningContract, 0ul, "Initialize", callParams, Times.Once);
+            VerifyCall(MiningGovernance, 0ul, nameof(IMiningGovernance.NotifyDistribution), callParams, Times.Once);
             VerifyLog(new DistributionEvent
             {
                 OwnerAddress = Owner,
-                MiningAddress = MiningContract,
+                MiningAddress = MiningGovernance,
                 OwnerAmount = DefaultOwnerSchedule[0],
                 MiningAmount = DefaultMiningSchedule[0],
                 YearIndex = 0
@@ -149,19 +151,22 @@ namespace OpdexTokenTests
             
             var token = CreateNewOpdexToken(Serializer.Serialize(DefaultOwnerSchedule), Serializer.Serialize(DefaultMiningSchedule), genesis);
             
-            PersistentState.SetAddress("MiningGovernance", MiningContract);
+            PersistentState.SetAddress(nameof(MiningGovernance), MiningGovernance);
             PersistentState.SetUInt256($"Balance:{Owner}", currentOwnerBalance);
-            PersistentState.SetUInt256($"Balance:{MiningContract}", currentMiningBalance);
-            PersistentState.SetUInt32("YearIndex", yearIndex);
-            PersistentState.SetUInt256("TotalSupply", currentTotalSupply);
+            PersistentState.SetUInt256($"Balance:{MiningGovernance}", currentMiningBalance);
+            PersistentState.SetUInt32(nameof(OpdexToken.YearIndex), yearIndex);
+            PersistentState.SetUInt256(nameof(OpdexToken.TotalSupply), currentTotalSupply);
 
             var block = (blocksPerYear * yearIndex) + genesis;
             SetupBlock(block);
+
+            var notifyParams = new object[] {new byte[0]};
+            SetupCall(MiningGovernance, 0ul, nameof(IMiningGovernance.NotifyDistribution), notifyParams, TransferResult.Transferred(null));
             
             token.Distribute(new byte[0]);
             
             token.GetBalance(Owner).Should().Be(expectedOwnerBalance);
-            token.GetBalance(MiningContract).Should().Be(expectedMiningBalance);
+            token.GetBalance(MiningGovernance).Should().Be(expectedMiningBalance);
             token.YearIndex.Should().Be(yearIndex + 1);
             token.TotalSupply.Should().Be(expectedTotalSupply);
 
@@ -169,17 +174,18 @@ namespace OpdexTokenTests
                 ? (uint) DefaultOwnerSchedule.Length - 1
                 : yearIndex;
             
+            VerifyCall(MiningGovernance, 0ul, nameof(IMiningGovernance.NotifyDistribution), notifyParams, Times.Once);
+            
             VerifyLog(new DistributionEvent
             {
                 OwnerAddress = Owner,
-                MiningAddress = MiningContract,
+                MiningAddress = MiningGovernance,
                 OwnerAmount = DefaultOwnerSchedule[scheduleIndex],
                 MiningAmount = DefaultMiningSchedule[scheduleIndex],
                 YearIndex = yearIndex
             }, Times.Once);
         }
-
-
+        
         [Fact]
         public void Distribute_Throws_TooEarly()
         {
@@ -189,8 +195,8 @@ namespace OpdexTokenTests
             
             var token = CreateNewOpdexToken(Serializer.Serialize(DefaultOwnerSchedule), Serializer.Serialize(DefaultMiningSchedule), genesis);
             
-            PersistentState.SetAddress("MiningGovernance", MiningContract);
-            PersistentState.SetUInt32("YearIndex", yearIndex);
+            PersistentState.SetAddress(nameof(MiningGovernance), MiningGovernance);
+            PersistentState.SetUInt32(nameof(OpdexToken.YearIndex), yearIndex);
 
             const ulong earlyBlock = ((blocksPerYear + genesis) * yearIndex) - 100;
             
@@ -198,7 +204,14 @@ namespace OpdexTokenTests
 
             token.Invoking(t => t.Distribute(new byte[0]))
                 .Should().Throw<SmartContractAssertException>()
-                .WithMessage("TOO_EARLY");
+                .WithMessage("OPDEX: DISTRIBUTION_NOT_READY");
+        }
+
+        [Fact]
+        public void Serialize_Distribution_Schedules()
+        {
+            Console.WriteLine(Serializer.Serialize(DefaultOwnerSchedule).ToHexString());
+            Console.WriteLine(Serializer.Serialize(DefaultMiningSchedule).ToHexString());
         }
     }
 }
