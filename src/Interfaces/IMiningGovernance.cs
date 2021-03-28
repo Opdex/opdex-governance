@@ -28,6 +28,10 @@ public interface IMiningGovernance
     /// </summary>
     bool Locked { get; }
     
+    /// <summary>
+    /// Flag describing if tokens have been distributed to this contract and is ready for calculating the yearly
+    /// mining amounts. Resets back to false after yearly calculations.
+    /// </summary>
     bool Distributed { get; }
         
     /// <summary>
@@ -61,5 +65,9 @@ public interface IMiningGovernance
     /// </summary>
     void NotifyMiningPool();
 
+    /// <summary>
+    /// Hook to notify this governance contract that funding from the token has been sent.
+    /// </summary>
+    /// <param name="data">Genesis liquidity pool addresses to set for mining. Not used after initial token distribution.</param>
     void NotifyDistribution(byte[] data);
 }

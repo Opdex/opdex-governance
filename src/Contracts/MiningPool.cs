@@ -1,104 +1,121 @@
 using Stratis.SmartContracts;
+using Stratis.SmartContracts.Standards;
 
-public class MiningPool : BaseContract, IMiningPool
+public class MiningPool : SmartContract, IMiningPool
 {
     public MiningPool(ISmartContractState contractState, Address rewardsDistribution, Address rewardsToken, Address stakingToken) 
         : base(contractState)
     {
         RewardsDistribution = rewardsDistribution;
-        RewardsToken = rewardsToken;
+        MinedToken = rewardsToken;
         StakingToken = stakingToken;
         RewardsDuration = 328_500 - 41_062; // 8 weeks - 1 week
     }
 
+    /// <inheritdoc />
     public Address RewardsDistribution
     {
         get => State.GetAddress(nameof(RewardsDistribution));
         private set => State.SetAddress(nameof(RewardsDistribution), value);
     }
 
+    /// <inheritdoc />
     public Address StakingToken
     {
         get => State.GetAddress(nameof(StakingToken));
         private set => State.SetAddress(nameof(StakingToken), value);
     }
 
-    public Address RewardsToken
+    /// <inheritdoc />
+    public Address MinedToken
     {
-        get => State.GetAddress(nameof(RewardsToken));
-        private set => State.SetAddress(nameof(RewardsToken), value);
+        get => State.GetAddress(nameof(MinedToken));
+        private set => State.SetAddress(nameof(MinedToken), value);
     }
 
+    /// <inheritdoc />
     public ulong PeriodFinish
     {
         get => State.GetUInt64(nameof(PeriodFinish));
         private set => State.SetUInt64(nameof(PeriodFinish), value);
     }
     
+    /// <inheritdoc />
     public UInt256 RewardRate
     {
         get => State.GetUInt256(nameof(RewardRate));
         private set => State.SetUInt256(nameof(RewardRate), value);
     }
-
+    
+    /// <inheritdoc />
     public ulong RewardsDuration
     {
         get => State.GetUInt64(nameof(RewardsDuration));
         private set => State.SetUInt64(nameof(RewardsDuration), value);
     }
     
-    public ulong LastUpdateTime
+    /// <inheritdoc />
+    public ulong LastUpdateBlock
     {
-        get => State.GetUInt64(nameof(LastUpdateTime));
-        private set => State.SetUInt64(nameof(LastUpdateTime), value);
+        get => State.GetUInt64(nameof(LastUpdateBlock));
+        private set => State.SetUInt64(nameof(LastUpdateBlock), value);
     }
     
+    /// <inheritdoc />
     public UInt256 RewardPerTokenStored
     {
         get => State.GetUInt256(nameof(RewardPerTokenStored));
         private set => State.SetUInt256(nameof(RewardPerTokenStored), value);
     }
     
+    /// <inheritdoc />
     public UInt256 TotalSupply
     {
         get => State.GetUInt256(nameof(TotalSupply));
         private set => State.SetUInt256(nameof(TotalSupply), value);
     }
 
+    /// <inheritdoc />
     public UInt256 GetUserRewardPerTokenPaid(Address user) 
         => State.GetUInt256($"UserRewardPerTokenPaid:{user}");
 
     private void SetUserRewardPerTokenPaid(Address user, UInt256 reward)
         => State.SetUInt256($"UserRewardPerTokenPaid:{user}", reward);
     
+    /// <inheritdoc />
     public UInt256 GetReward(Address user)
         => State.GetUInt256($"Reward:{user}");
 
     private void SetReward(Address user, UInt256 reward)
         => State.SetUInt256($"Rewards:{user}", reward);
     
+    /// <inheritdoc />
     public UInt256 GetBalance(Address user)
         => State.GetUInt256($"Balance:{user}");
 
     private void SetBalance(Address user, UInt256 reward)
         => State.SetUInt256($"Balance:{user}", reward);
 
+    /// <inheritdoc />
     public ulong LastTimeRewardApplicable()
         => Block.Number > PeriodFinish ? PeriodFinish : Block.Number;
     
+    /// <inheritdoc />
     public UInt256 GetRewardForDuration() => RewardRate * RewardsDuration;
 
+    /// <inheritdoc />
     public UInt256 RewardPerToken()
     {
         if (TotalSupply == 0) return RewardPerTokenStored;
 
-        var blocksToUpdate = LastTimeRewardApplicable() - LastUpdateTime;
+        var blocksToUpdate = LastTimeRewardApplicable() - LastUpdateBlock;
         
         var result = RewardPerTokenStored + ((blocksToUpdate * RewardRate * 100_000_000) / TotalSupply);
 
         return result;
     }
 
+    /// <inheritdoc />
     public UInt256 Earned(Address address)
     {
         var balance = GetBalance(address);
@@ -110,6 +127,7 @@ public class MiningPool : BaseContract, IMiningPool
         return balance * remainingReward / 100_000_000 + reward;
     }
 
+    /// <inheritdoc />
     public void Mine(UInt256 amount)
     {
         UpdateReward(Message.Sender);
@@ -125,6 +143,7 @@ public class MiningPool : BaseContract, IMiningPool
         Log(new StakedEvent { User = Message.Sender, Amount = amount });
     }
 
+    /// <inheritdoc />
     public void Withdraw(UInt256 amount)
     {
         UpdateReward(Message.Sender);
@@ -140,6 +159,7 @@ public class MiningPool : BaseContract, IMiningPool
         Log(new WithdrawnEvent { User = Message.Sender, Amount = amount });
     }
 
+    /// <inheritdoc />
     public void GetReward()
     {
         UpdateReward(Message.Sender);
@@ -150,12 +170,13 @@ public class MiningPool : BaseContract, IMiningPool
         {
             SetReward(Message.Sender, 0);
             
-            SafeTransferTo(RewardsToken, Message.Sender, reward);
+            SafeTransferTo(MinedToken, Message.Sender, reward);
             
             Log(new RewardPaidEvent { User = Message.Sender, Reward = reward });
         }
     }
 
+    /// <inheritdoc />
     public void ExitMining()
     {
         Withdraw(GetBalance(Message.Sender));
@@ -163,6 +184,7 @@ public class MiningPool : BaseContract, IMiningPool
         GetReward();
     }
     
+    /// <inheritdoc />
     public void NotifyRewardAmount(UInt256 reward)
     {
         Assert(Message.Sender == RewardsDistribution);
@@ -181,13 +203,13 @@ public class MiningPool : BaseContract, IMiningPool
             RewardRate = reward + leftover / RewardsDuration;
         }
 
-        var balanceResult = Call(RewardsToken, 0, "GetBalance", new object[] {Address});
+        var balanceResult = Call(MinedToken, 0, nameof(IStandardToken.GetBalance), new object[] {Address});
         var balance = (UInt256) balanceResult.ReturnValue;
         
         Assert(balanceResult.Success && balance > 0);
         Assert(RewardRate <= balance / RewardsDuration, "OPDEX: PROVIDED_REWARD_TOO_HIGH");
 
-        LastUpdateTime = Block.Number;
+        LastUpdateBlock = Block.Number;
         PeriodFinish = Block.Number + RewardsDuration;
         
         Log(new RewardAddedEvent { Reward = reward });
@@ -198,7 +220,7 @@ public class MiningPool : BaseContract, IMiningPool
         var rewardPerToken = RewardPerToken();
         
         RewardPerTokenStored = rewardPerToken;
-        LastUpdateTime = LastTimeRewardApplicable();
+        LastUpdateBlock = LastTimeRewardApplicable();
 
         if (account != Address.Zero)
         {
@@ -213,7 +235,7 @@ public class MiningPool : BaseContract, IMiningPool
     {
         if (amount == 0) return;
         
-        var result = Call(token, 0, "TransferTo", new object[] {to, amount});
+        var result = Call(token, 0, nameof(IStandardToken.TransferTo), new object[] {to, amount});
         
         Assert(result.Success && (bool)result.ReturnValue, "OPDEX: INVALID_TRANSFER_TO");
     }
@@ -222,31 +244,8 @@ public class MiningPool : BaseContract, IMiningPool
     {
         if (amount == 0) return;
         
-        var result = Call(token, 0, "TransferFrom", new object[] {from, to, amount});
+        var result = Call(token, 0, nameof(IStandardToken.TransferFrom), new object[] {from, to, amount});
         
         Assert(result.Success && (bool)result.ReturnValue, "OPDEX: INVALID_TRANSFER_FROM");
-    }
-
-    public struct RewardAddedEvent
-    {
-        [Index] public UInt256 Reward;
-    }
-
-    public struct StakedEvent
-    {
-        [Index] public Address User;
-        public UInt256 Amount;
-    }
-
-    public struct WithdrawnEvent
-    {
-        [Index] public Address User;
-        public UInt256 Amount;
-    }
-
-    public struct RewardPaidEvent
-    {
-        [Index] public Address User;
-        public UInt256 Reward;
     }
 }

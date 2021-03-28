@@ -1,7 +1,8 @@
 using System;
 using Stratis.SmartContracts;
+using Stratis.SmartContracts.Standards;
 
-public class MiningGovernance : BaseContract, IMiningGovernance
+public class MiningGovernance : SmartContract, IMiningGovernance
 {
     private const uint MaximumNominations = 4;
     private const uint BlocksPerYear = 1_971_000;
@@ -15,54 +16,63 @@ public class MiningGovernance : BaseContract, IMiningGovernance
         Nominations = new Nomination[0];
     }
 
+    /// <inheritdoc />
     public Address MinedToken
     {
         get => State.GetAddress(nameof(MinedToken));
         private set => State.SetAddress(nameof(MinedToken), value);
     }
 
+    /// <inheritdoc />
     public bool Distributed
     {
         get => State.GetBool(nameof(Distributed));
         private set => State.SetBool(nameof(Distributed), value);
     }
 
+    /// <inheritdoc />
     public Nomination[] Nominations
     {
         get => State.GetArray<Nomination>(nameof(Nominations));
         private set => State.SetArray(nameof(Nominations), value);
     }
 
+    /// <inheritdoc />
     public ulong NominationPeriodEnd
     {
         get => State.GetUInt64(nameof(NominationPeriodEnd));
         private set => State.SetUInt64(nameof(NominationPeriodEnd), value);
     }
 
+    /// <inheritdoc />
     public uint MiningPoolsFunded
     {
         get => State.GetUInt32(nameof(MiningPoolsFunded));
         private set => State.SetUInt32(nameof(MiningPoolsFunded), value);
     }
 
+    /// <inheritdoc />
     public UInt256 MiningPoolReward
     {
         get => State.GetUInt256(nameof(MiningPoolReward));
         private set => State.SetUInt256(nameof(MiningPoolReward), value);
     }
 
+    /// <inheritdoc />
     public bool Locked
     {
         get => State.GetBool(nameof(Locked));
         private set => State.SetBool(nameof(Locked), value);
     }
 
+    /// <inheritdoc />
     public Address GetMiningPool(Address stakingPool) => 
         State.GetAddress($"MiningPool:{stakingPool}");
 
     private void SetMiningPool(Address stakingPool, Address miningPool) => 
         State.SetAddress($"MiningPool:{stakingPool}", miningPool);
     
+    /// <inheritdoc />
     public void NotifyDistribution(byte[] data)
     {
         EnsureUnlocked();
@@ -93,24 +103,26 @@ public class MiningGovernance : BaseContract, IMiningGovernance
         Unlock();
     }
     
+    /// <inheritdoc />
     public void NominateLiquidityPool(Address stakingPool, UInt256 weight)
     {
         EnsureSenderIsMinedToken();
         
-        if (Block.Number <= NominationPeriodEnd) return;
+        if (Block.Number >= NominationPeriodEnd) return;
         
         var nomination = new Nomination {StakingPool = stakingPool, Weight = weight};
         var nominations = Nominations;
         var existingIndex = StakingPoolNominationIndex(nominations, stakingPool);
-        
+        var currentLength = nominations.Length;
+            
         if (existingIndex >= 0)
         {
             nominations[existingIndex].Weight = weight;
         }
-        else if (nominations.Length < MaximumNominations)
+        else if (currentLength < MaximumNominations)
         {
-            Array.Resize(ref nominations, nominations.Length + 1);           
-            nominations[nominations.Length] = nomination;
+            Array.Resize(ref nominations, currentLength + 1);           
+            nominations[currentLength] = nomination;
         }
         else
         {
@@ -130,6 +142,7 @@ public class MiningGovernance : BaseContract, IMiningGovernance
         });
     }
 
+    /// <inheritdoc />
     public void NotifyMiningPools()
     {
         EnsureUnlocked();
@@ -150,6 +163,7 @@ public class MiningGovernance : BaseContract, IMiningGovernance
         Unlock();
     }
     
+    /// <inheritdoc />
     public void NotifyMiningPool()
     {
         EnsureUnlocked();
@@ -186,7 +200,7 @@ public class MiningGovernance : BaseContract, IMiningGovernance
         
         SafeTransferTo(MinedToken, miningPool, reward);
 
-        Assert(Call(miningPool, 0, "NotifyRewardAmount").Success);
+        Assert(Call(miningPool, 0, nameof(IMiningPool.NotifyRewardAmount)).Success);
         
         Log(new MiningPoolRewardedEvent
         {
@@ -208,7 +222,7 @@ public class MiningGovernance : BaseContract, IMiningGovernance
     {
         Assert(Distributed, "OPDEX: TOKEN_DISTRIBUTION_REQUIRED");
 
-        var balance = (UInt256)Call(MinedToken, 0ul, "GetBalance", new object[] {Address}).ReturnValue;
+        var balance = (UInt256)Call(MinedToken, 0ul, nameof(IStandardToken.GetBalance), new object[] {Address}).ReturnValue;
         
         Assert(balance > MiningPoolsPerYear, "OPDEX: INVALID_BALANCE");
 
@@ -256,7 +270,9 @@ public class MiningGovernance : BaseContract, IMiningGovernance
 
     private static int StakingPoolNominationIndex(Nomination[] nominations, Address stakingPool)
     {
-        for (var i = 0; i < MaximumNominations; i++)
+        var max = nominations.Length < MaximumNominations ? (uint)nominations.Length : MaximumNominations;
+        
+        for (var i = 0; i < max; i++)
         {
             if (nominations[i].StakingPool == stakingPool) return i;
         }
@@ -268,7 +284,7 @@ public class MiningGovernance : BaseContract, IMiningGovernance
     {
         if (amount == 0) return;
         
-        var result = Call(token, 0, "TransferTo", new object[] {to, amount});
+        var result = Call(token, 0, nameof(IStandardToken.TransferTo), new object[] {to, amount});
         
         Assert(result.Success && (bool)result.ReturnValue, "OPDEX: INVALID_TRANSFER_TO");
     }
