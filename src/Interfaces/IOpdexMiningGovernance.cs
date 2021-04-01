@@ -1,6 +1,6 @@
 using Stratis.SmartContracts;
 
-public interface IMiningGovernance
+public interface IOpdexMiningGovernance
 {
     /// <summary>
     /// The address of the token being mined (rewarded).

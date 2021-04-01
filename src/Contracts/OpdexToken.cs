@@ -1,28 +1,50 @@
 ﻿using Stratis.SmartContracts;
 
+/// <summary>
+/// 
+/// </summary>
 [Deploy]
 public class OpdexToken : SmartContract, IOpdexToken
 {
+    private const string TokenName = "Opdex";
+    private const string TokenSymbol = "OPDX";
+    private const byte TokenDecimals = 8;
     private const ulong BlocksPerYear = 1_971_000; // based on 16 second blocks
     
-    public OpdexToken(ISmartContractState contractState, string name, string symbol, byte decimals, byte[] ownerDistribution, byte[] miningDistribution) 
-        : base(contractState)
+    /// <summary>
+    /// Constructor initializing opdex token contract.
+    /// </summary>
+    /// <param name="state">Smart contract state.</param>
+    /// <param name="ownerDistribution"></param>
+    /// <param name="miningDistribution"></param>
+    public OpdexToken(ISmartContractState state, byte[] ownerDistribution, byte[] miningDistribution) : base(state)
     {
         var ownerSchedule = Serializer.ToArray<UInt256>(ownerDistribution);
         var miningSchedule = Serializer.ToArray<UInt256>(miningDistribution);
-        var ownerLength = ownerSchedule.Length;
-        var miningLength = miningSchedule.Length;
-        
-        Assert(ownerLength > 1 && miningLength > 1 && ownerLength == miningLength);
+
+        Assert(ownerSchedule.Length > 1 && ownerSchedule.Length == miningSchedule.Length);
 
         Owner = Message.Sender;
         Genesis = Block.Number;
         OwnerSchedule = ownerSchedule;
         MiningSchedule = miningSchedule;
-        Name = name;
-        Symbol = symbol;
-        Decimals = decimals;
-        MiningGovernance = Create<MiningGovernance>(0ul, new object[] {Address}).NewContractAddress;
+        MiningGovernance = Create<OpdexMiningGovernance>(0ul, new object[] {Address}).NewContractAddress;
+    }
+    
+    /// <inheritdoc />
+    public string Symbol => TokenSymbol;
+
+    /// <inheritdoc />
+    public string Name => TokenName;
+
+    /// <inheritdoc />
+    public byte Decimals => TokenDecimals;
+    
+    /// <inheritdoc />
+    public UInt256 TotalSupply
+    {
+        get => State.GetUInt256(nameof(TotalSupply));
+        private set => State.SetUInt256(nameof(TotalSupply), value);
     }
 
     /// <inheritdoc />
@@ -66,53 +88,33 @@ public class OpdexToken : SmartContract, IOpdexToken
         get => State.GetUInt32(nameof(YearIndex));
         private set => State.SetUInt32(nameof(YearIndex), value);
     }
-    
-    /// <inheritdoc />
-    public string Symbol
-    {
-        get => State.GetString(nameof(Symbol));
-        private set => State.SetString(nameof(Symbol), value);
-    }
-    
-    /// <inheritdoc />
-    public string Name
-    {
-        get => State.GetString(nameof(Name));
-        private set => State.SetString(nameof(Name), value);
-    }
 
     /// <inheritdoc />
-    public byte Decimals
+    public UInt256 GetBalance(Address address)
     {
-        get => State.GetBytes(nameof(Decimals))[0];
-        private set => State.SetBytes(nameof(Decimals), new[] { value });
+        return State.GetUInt256($"Balance:{address}");
     }
 
-    /// <inheritdoc />
-    public UInt256 TotalSupply
+    private void SetBalance(Address address, UInt256 value)
     {
-        get => State.GetUInt256(nameof(TotalSupply));
-        private set => State.SetUInt256(nameof(TotalSupply), value);
-    }
-    
-    /// <inheritdoc />
-    public UInt256 GetBalance(Address address) => 
-        State.GetUInt256($"Balance:{address}");
-
-    private void SetBalance(Address address, UInt256 value) => 
         State.SetUInt256($"Balance:{address}", value);
+    }
 
-    private void SetApproval(Address owner, Address spender, UInt256 value) => 
+    private void SetApproval(Address owner, Address spender, UInt256 value)
+    {
         State.SetUInt256($"Allowance:{owner}:{spender}", value);
+    }
 
     /// <inheritdoc />
-    public UInt256 Allowance(Address owner, Address spender) => 
-        State.GetUInt256($"Allowance:{owner}:{spender}");
+    public UInt256 Allowance(Address owner, Address spender)
+    {
+        return State.GetUInt256($"Allowance:{owner}:{spender}");
+    }
     
     /// <inheritdoc />
     public void NominateLiquidityPool()
     {
-        Assert(State.IsContract(Message.Sender));
+        Assert(State.IsContract(Message.Sender), "OPDEX: INVALID_SENDER");
 
         var balance = GetBalance(Message.Sender);
 
@@ -145,7 +147,7 @@ public class OpdexToken : SmartContract, IOpdexToken
         SetBalance(miningGov, GetBalance(miningGov) + miningTokens);
 
         data = yearIndex == 0 ? data : new byte[0];
-        var notificationResponse = Call(miningGov, 0ul, "NotifyDistribution", new object[] {data});
+        var notificationResponse = Call(miningGov, 0ul, nameof(IOpdexMiningGovernance.NotifyDistribution), new object[] {data});
         
         Assert(notificationResponse.Success, "OPDEX: FAILED_DISTRIBUTION_NOTIFICATION");
 
@@ -184,14 +186,10 @@ public class OpdexToken : SmartContract, IOpdexToken
 
         var senderBalance = GetBalance(Message.Sender);
 
-        if (senderBalance < amount)
-        {
-            return false;
-        }
+        if (senderBalance < amount) return false;
 
         SetBalance(Message.Sender, senderBalance - amount);
-
-        SetBalance(to, checked(GetBalance(to) + amount));
+        SetBalance(to, GetBalance(to) + amount);
 
         Log(new TransferLog { From = Message.Sender, To = to, Amount = amount });
 
@@ -211,15 +209,10 @@ public class OpdexToken : SmartContract, IOpdexToken
         var senderAllowance = Allowance(from, Message.Sender);
         var fromBalance = GetBalance(from);
 
-        if (senderAllowance < amount || fromBalance < amount)
-        {
-            return false;
-        }
+        if (senderAllowance < amount || fromBalance < amount) return false;
 
         SetApproval(from, Message.Sender, senderAllowance - amount);
-
         SetBalance(from, fromBalance - amount);
-
         SetBalance(to, GetBalance(to) + amount);
 
         Log(new TransferLog { From = from, To = to, Amount = amount });
@@ -230,10 +223,7 @@ public class OpdexToken : SmartContract, IOpdexToken
     /// <inheritdoc />
     public bool Approve(Address spender, UInt256 currentAmount, UInt256 amount)
     {
-        if (Allowance(Message.Sender, spender) != currentAmount)
-        {
-            return false;
-        }
+        if (Allowance(Message.Sender, spender) != currentAmount) return false;
 
         SetApproval(Message.Sender, spender, amount);
 

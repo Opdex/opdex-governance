@@ -7,21 +7,21 @@ using Xunit;
 
 namespace OpdexTokenTests
 {
-    public class MiningPoolTests : TestBase
+    public class OpdexMiningPoolTests : TestBase
     {
         [Fact]
         public void CreatesContract_Success()
         {
             var staking = CreateNewMiningPool();
 
-            staking.RewardsDistribution.Should().Be(MiningGovernance);
+            staking.MiningGovernance.Should().Be(MiningGovernance);
             staking.MinedToken.Should().Be(OPDX);
             staking.StakingToken.Should().Be(Pool1);
-            staking.RewardsDuration.Should().Be(287438);
+            staking.MiningDuration.Should().Be(287438);
             staking.TotalSupply.Should().Be(UInt256.Zero);
-            staking.PeriodFinish.Should().Be(0);
+            staking.MiningPeriodEndBlock.Should().Be(0);
             staking.LastUpdateBlock.Should().Be(0);
-            staking.RewardPerTokenStored.Should().Be(UInt256.Zero);
+            staking.RewardPerToken.Should().Be(UInt256.Zero);
         }
 
         [Theory]
@@ -29,11 +29,11 @@ namespace OpdexTokenTests
         [InlineData(101, 100, 100)]
         public void LastTimeRewardApplicable_Success(ulong currentBlock, ulong periodFinish, ulong expected)
         {
-            PersistentState.SetUInt64(nameof(MiningPool.PeriodFinish), periodFinish);
+            PersistentState.SetUInt64(nameof(IOpdexMiningPool.MiningPeriodEndBlock), periodFinish);
 
             var staking = CreateNewMiningPool(currentBlock);
 
-            staking.LastTimeRewardApplicable().Should().Be(expected);
+            staking.LatestBlockApplicable().Should().Be(expected);
         }
 
         [Theory]
@@ -44,17 +44,17 @@ namespace OpdexTokenTests
             UInt256 totalSupply, UInt256 rewardRate, UInt256 expected)
         {
             // Todo: Add to tests for this
-            PersistentState.SetUInt256(nameof(MiningPool.RewardPerTokenStored), 0);
-            PersistentState.SetUInt256(nameof(MiningPool.TotalSupply), totalSupply);
-            PersistentState.SetUInt256(nameof(MiningPool.RewardRate), rewardRate);
-            PersistentState.SetUInt64(nameof(MiningPool.LastUpdateBlock), lastUpdateTime);
-            PersistentState.SetUInt64(nameof(MiningPool.PeriodFinish), periodFinish);
+            PersistentState.SetUInt256(nameof(IOpdexMiningPool.RewardPerToken), 0);
+            PersistentState.SetUInt256(nameof(IOpdexMiningPool.TotalSupply), totalSupply);
+            PersistentState.SetUInt256(nameof(IOpdexMiningPool.RewardRate), rewardRate);
+            PersistentState.SetUInt64(nameof(IOpdexMiningPool.LastUpdateBlock), lastUpdateTime);
+            PersistentState.SetUInt64(nameof(IOpdexMiningPool.MiningPeriodEndBlock), periodFinish);
 
             var staking = CreateNewMiningPool(periodStart);
 
             SetupBlock(currentBlock);
 
-            var rewardPerToken = staking.RewardPerToken();
+            var rewardPerToken = staking.GetRewardPerToken();
 
             rewardPerToken.Should().Be(expected);
         }
@@ -65,11 +65,11 @@ namespace OpdexTokenTests
         public void Earned_Success(ulong periodStart, ulong periodFinish, ulong currentBlock, ulong lastUpdateTime,
             UInt256 totalSupply, UInt256 rewardRate, UInt256 expected)
         {
-            PersistentState.SetUInt256(nameof(MiningPool.RewardPerTokenStored), 0);
-            PersistentState.SetUInt256(nameof(MiningPool.TotalSupply), totalSupply);
-            PersistentState.SetUInt256(nameof(MiningPool.RewardRate), rewardRate);
-            PersistentState.SetUInt64(nameof(MiningPool.LastUpdateBlock), lastUpdateTime);
-            PersistentState.SetUInt64(nameof(MiningPool.PeriodFinish), periodFinish);
+            PersistentState.SetUInt256(nameof(IOpdexMiningPool.RewardPerToken), 0);
+            PersistentState.SetUInt256(nameof(IOpdexMiningPool.TotalSupply), totalSupply);
+            PersistentState.SetUInt256(nameof(IOpdexMiningPool.RewardRate), rewardRate);
+            PersistentState.SetUInt64(nameof(IOpdexMiningPool.LastUpdateBlock), lastUpdateTime);
+            PersistentState.SetUInt64(nameof(IOpdexMiningPool.MiningPeriodEndBlock), periodFinish);
             
             // Todo: change this
             PersistentState.SetUInt256($"Balance:{Miner1}", totalSupply);
@@ -94,11 +94,11 @@ namespace OpdexTokenTests
         public void Mine_Success(ulong periodStart, ulong periodFinish, ulong currentBlock, ulong lastUpdateTime,
             UInt256 totalSupply, UInt256 rewardRate, UInt256 amount, UInt256 userRewardPerTokenPaid)
         {
-            PersistentState.SetUInt256(nameof(MiningPool.RewardPerTokenStored), 0);
-            PersistentState.SetUInt256(nameof(MiningPool.TotalSupply), totalSupply);
-            PersistentState.SetUInt256(nameof(MiningPool.RewardRate), rewardRate);
-            PersistentState.SetUInt64(nameof(MiningPool.LastUpdateBlock), lastUpdateTime);
-            PersistentState.SetUInt64(nameof(MiningPool.PeriodFinish), periodFinish);
+            PersistentState.SetUInt256(nameof(IOpdexMiningPool.RewardPerToken), 0);
+            PersistentState.SetUInt256(nameof(IOpdexMiningPool.TotalSupply), totalSupply);
+            PersistentState.SetUInt256(nameof(IOpdexMiningPool.RewardRate), rewardRate);
+            PersistentState.SetUInt64(nameof(IOpdexMiningPool.LastUpdateBlock), lastUpdateTime);
+            PersistentState.SetUInt64(nameof(IOpdexMiningPool.MiningPeriodEndBlock), periodFinish);
 
             var transferParams = new object[] { Miner1, MiningPool1, amount };
             SetupCall(Pool1, 0ul, "TransferFrom", transferParams, TransferResult.Transferred(true));
@@ -113,10 +113,10 @@ namespace OpdexTokenTests
             staking.TotalSupply.Should().Be(totalSupply + amount);
             staking.GetBalance(Miner1).Should().Be(amount);
             staking.GetReward(Miner1).Should().Be(UInt256.Zero);
-            staking.GetUserRewardPerTokenPaid(Miner1).Should().Be(userRewardPerTokenPaid);
+            staking.GetRewardPerTokenPaid(Miner1).Should().Be(userRewardPerTokenPaid);
 
             VerifyCall(Pool1, 0ul, "TransferFrom", transferParams, Times.Once);
-            VerifyLog(new StakedEvent { User = Miner1, Amount = amount }, Times.Once);
+            VerifyLog(new StakedEvent { To = Miner1, Amount = amount }, Times.Once);
         }
 
         [Theory]
@@ -125,11 +125,11 @@ namespace OpdexTokenTests
         public void WithdrawSuccess(ulong periodStart, ulong periodFinish, ulong currentBlock, ulong lastUpdateTime,
             UInt256 totalSupply, UInt256 rewardRate, UInt256 amount)
         {
-            PersistentState.SetUInt256(nameof(MiningPool.RewardPerTokenStored), 0);
-            PersistentState.SetUInt256(nameof(MiningPool.TotalSupply), totalSupply);
-            PersistentState.SetUInt256(nameof(MiningPool.RewardRate), rewardRate);
-            PersistentState.SetUInt64(nameof(MiningPool.LastUpdateBlock), lastUpdateTime);
-            PersistentState.SetUInt64(nameof(MiningPool.PeriodFinish), periodFinish);
+            PersistentState.SetUInt256(nameof(IOpdexMiningPool.RewardPerToken), 0);
+            PersistentState.SetUInt256(nameof(IOpdexMiningPool.TotalSupply), totalSupply);
+            PersistentState.SetUInt256(nameof(IOpdexMiningPool.RewardRate), rewardRate);
+            PersistentState.SetUInt64(nameof(IOpdexMiningPool.LastUpdateBlock), lastUpdateTime);
+            PersistentState.SetUInt64(nameof(IOpdexMiningPool.MiningPeriodEndBlock), periodFinish);
 
             var transferParams = new object[] { Miner1, MiningPool1, amount };
             SetupCall(Pool1, 0ul, "TransferFrom", transferParams, TransferResult.Transferred(true));
@@ -149,7 +149,7 @@ namespace OpdexTokenTests
             staking.GetBalance(Miner1).Should().Be(UInt256.Zero);
             
             VerifyCall(Pool1, 0ul, "TransferTo", transferToParams, Times.Once);
-            VerifyLog(new WithdrawnEvent { User = Miner1, Amount = amount }, Times.Once);
+            VerifyLog(new WithdrawnEvent { To = Miner1, Amount = amount }, Times.Once);
         }
 
         [Theory]
@@ -158,11 +158,11 @@ namespace OpdexTokenTests
         public void GetReward_Success(ulong periodStart, ulong periodFinish, ulong currentBlock, ulong lastUpdateTime,
             UInt256 totalSupply, UInt256 rewardRate, UInt256 amount, UInt256 reward)
         {
-            // PersistentState.SetUInt256(nameof(MiningPool.RewardPerTokenStored), 0);
-            PersistentState.SetUInt256(nameof(MiningPool.TotalSupply), totalSupply);
-            PersistentState.SetUInt256(nameof(MiningPool.RewardRate), rewardRate);
-            PersistentState.SetUInt64(nameof(MiningPool.LastUpdateBlock), lastUpdateTime);
-            PersistentState.SetUInt64(nameof(MiningPool.PeriodFinish), periodFinish);
+            // PersistentState.SetUInt256(nameof(IOpdexMiningPool.RewardPerToken), 0);
+            PersistentState.SetUInt256(nameof(IOpdexMiningPool.TotalSupply), totalSupply);
+            PersistentState.SetUInt256(nameof(IOpdexMiningPool.RewardRate), rewardRate);
+            PersistentState.SetUInt64(nameof(IOpdexMiningPool.LastUpdateBlock), lastUpdateTime);
+            PersistentState.SetUInt64(nameof(IOpdexMiningPool.MiningPeriodEndBlock), periodFinish);
 
             var transferParams = new object[] { Miner1, MiningPool1, amount };
             SetupCall(Pool1, 0ul, "TransferFrom", transferParams, TransferResult.Transferred(true));
@@ -184,10 +184,10 @@ namespace OpdexTokenTests
             var transferToRewardParams = new object[] {Miner1, reward};
             SetupCall(OPDX, 0ul, "TransferTo", transferToRewardParams, TransferResult.Transferred(true));
             
-            staking.GetReward();
+            staking.Collect();
             
             VerifyCall(OPDX, 0ul, "TransferTo", transferToRewardParams, Times.Once);
-            VerifyLog(new RewardPaidEvent { User = Miner1, Reward = reward }, Times.Once);
+            VerifyLog(new RewardPaidEvent { To = Miner1, Amount = reward }, Times.Once);
         }
 
         [Fact]

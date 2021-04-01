@@ -2,14 +2,22 @@ using System;
 using Stratis.SmartContracts;
 using Stratis.SmartContracts.Standards;
 
-public class MiningGovernance : SmartContract, IMiningGovernance
+/// <summary>
+/// 
+/// </summary>
+public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
 {
     private const uint MaximumNominations = 4;
     private const uint BlocksPerYear = 1_971_000;
     private const uint OneMonthBlocks = BlocksPerYear / 12;
     private const uint MiningPoolsPerYear = 48;
         
-    public MiningGovernance(ISmartContractState contractState, Address minedToken) : base(contractState)
+    /// <summary>
+    /// Constructor initializing opdex token mining governance contract.
+    /// </summary>
+    /// <param name="state">Smart contract state.</param>
+    /// <param name="minedToken">The address of the token being mined.</param>
+    public OpdexMiningGovernance(ISmartContractState state, Address minedToken) : base(state)
     {
         MinedToken = minedToken;
         NominationPeriodEnd = OneMonthBlocks / 4 + Block.Number;
@@ -66,11 +74,15 @@ public class MiningGovernance : SmartContract, IMiningGovernance
     }
 
     /// <inheritdoc />
-    public Address GetMiningPool(Address stakingPool) => 
-        State.GetAddress($"MiningPool:{stakingPool}");
+    public Address GetMiningPool(Address stakingPool)
+    {
+        return State.GetAddress($"MiningPool:{stakingPool}");
+    }
 
-    private void SetMiningPool(Address stakingPool, Address miningPool) => 
+    private void SetMiningPool(Address stakingPool, Address miningPool)
+    {
         State.SetAddress($"MiningPool:{stakingPool}", miningPool);
+    }
     
     /// <inheritdoc />
     public void NotifyDistribution(byte[] data)
@@ -200,7 +212,7 @@ public class MiningGovernance : SmartContract, IMiningGovernance
         
         SafeTransferTo(MinedToken, miningPool, reward);
 
-        Assert(Call(miningPool, 0, nameof(IMiningPool.NotifyRewardAmount)).Success);
+        Assert(Call(miningPool, 0, nameof(IOpdexMiningPool.NotifyRewardAmount)).Success);
         
         Log(new MiningPoolRewardedEvent
         {
@@ -237,7 +249,7 @@ public class MiningGovernance : SmartContract, IMiningGovernance
 
         if (miningPool != Address.Zero) return miningPool;
 
-        miningPool = Create<MiningPool>(0ul, new object[] { Address, MinedToken, stakingPool }).NewContractAddress;
+        miningPool = Create<OpdexMiningPool>(0ul, new object[] { Address, MinedToken, stakingPool }).NewContractAddress;
         
         SetMiningPool(stakingPool, miningPool);
         
@@ -289,11 +301,15 @@ public class MiningGovernance : SmartContract, IMiningGovernance
         Assert(result.Success && (bool)result.ReturnValue, "OPDEX: INVALID_TRANSFER_TO");
     }
 
-    private void EnsureNominationPeriodEnded() =>
+    private void EnsureNominationPeriodEnded()
+    {
         Assert(Block.Number > NominationPeriodEnd, "OPDEX: NOMINATION_PERIOD_ACTIVE");
+    }
 
-    private void EnsureSenderIsMinedToken() => 
-        Assert(Message.Sender == MinedToken, "OPDEX: INVALID_SENDER");
+    private void EnsureSenderIsMinedToken()
+    {
+        Assert(Message.Sender == MinedToken, "OPDEX: INVALID_SENDER"); 
+    }
 
     private void EnsureUnlocked()
     {

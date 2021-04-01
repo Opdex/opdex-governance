@@ -25,7 +25,7 @@ namespace OpdexTokenTests
             token.Owner.Should().Be(Owner);
             token.Name.Should().Be("Opdex");
             token.Symbol.Should().Be("OPDX");
-            token.Decimals.Should().Be(18);
+            token.Decimals.Should().Be(8);
             token.Genesis.Should().Be(10ul);
             token.TotalSupply.Should().Be(UInt256.Zero);
             token.GetBalance(Owner).Should().Be(UInt256.Zero);
@@ -112,10 +112,10 @@ namespace OpdexTokenTests
             var stakingTokens = Serializer.Serialize(new[] { Miner1, Pool1, OPDX, Owner }); // Any 4 address, not important for this test
 
             var createParams = new object[] { OPDX };
-            SetupCreate<MiningGovernance>(CreateResult.Succeeded(MiningGovernance), 0ul, createParams);
+            SetupCreate<OpdexMiningGovernance>(CreateResult.Succeeded(MiningGovernance), 0ul, createParams);
 
             var callParams = new object[] { stakingTokens };
-            SetupCall(MiningGovernance, 0ul, nameof(IMiningGovernance.NotifyDistribution), callParams, TransferResult.Transferred(null));
+            SetupCall(MiningGovernance, 0ul, nameof(IOpdexMiningGovernance.NotifyDistribution), callParams, TransferResult.Transferred(null));
             
             token.Distribute(stakingTokens);
             
@@ -124,8 +124,8 @@ namespace OpdexTokenTests
             token.YearIndex.Should().Be(1);
             token.TotalSupply.Should().Be((UInt256)400_000_000);
 
-            VerifyCreate<MiningGovernance>(0ul, createParams, Times.Once);
-            VerifyCall(MiningGovernance, 0ul, nameof(IMiningGovernance.NotifyDistribution), callParams, Times.Once);
+            VerifyCreate<OpdexMiningGovernance>(0ul, createParams, Times.Once);
+            VerifyCall(MiningGovernance, 0ul, nameof(IOpdexMiningGovernance.NotifyDistribution), callParams, Times.Once);
             VerifyLog(new DistributionEvent
             {
                 OwnerAddress = Owner,
@@ -154,14 +154,14 @@ namespace OpdexTokenTests
             PersistentState.SetAddress(nameof(MiningGovernance), MiningGovernance);
             PersistentState.SetUInt256($"Balance:{Owner}", currentOwnerBalance);
             PersistentState.SetUInt256($"Balance:{MiningGovernance}", currentMiningBalance);
-            PersistentState.SetUInt32(nameof(OpdexToken.YearIndex), yearIndex);
-            PersistentState.SetUInt256(nameof(OpdexToken.TotalSupply), currentTotalSupply);
+            PersistentState.SetUInt32(nameof(IOpdexToken.YearIndex), yearIndex);
+            PersistentState.SetUInt256(nameof(IOpdexToken.TotalSupply), currentTotalSupply);
 
             var block = (blocksPerYear * yearIndex) + genesis;
             SetupBlock(block);
 
             var notifyParams = new object[] {new byte[0]};
-            SetupCall(MiningGovernance, 0ul, nameof(IMiningGovernance.NotifyDistribution), notifyParams, TransferResult.Transferred(null));
+            SetupCall(MiningGovernance, 0ul, nameof(IOpdexMiningGovernance.NotifyDistribution), notifyParams, TransferResult.Transferred(null));
             
             token.Distribute(new byte[0]);
             
@@ -174,7 +174,7 @@ namespace OpdexTokenTests
                 ? (uint) DefaultOwnerSchedule.Length - 1
                 : yearIndex;
             
-            VerifyCall(MiningGovernance, 0ul, nameof(IMiningGovernance.NotifyDistribution), notifyParams, Times.Once);
+            VerifyCall(MiningGovernance, 0ul, nameof(IOpdexMiningGovernance.NotifyDistribution), notifyParams, Times.Once);
             
             VerifyLog(new DistributionEvent
             {
@@ -196,7 +196,7 @@ namespace OpdexTokenTests
             var token = CreateNewOpdexToken(Serializer.Serialize(DefaultOwnerSchedule), Serializer.Serialize(DefaultMiningSchedule), genesis);
             
             PersistentState.SetAddress(nameof(MiningGovernance), MiningGovernance);
-            PersistentState.SetUInt32(nameof(OpdexToken.YearIndex), yearIndex);
+            PersistentState.SetUInt32(nameof(IOpdexToken.YearIndex), yearIndex);
 
             const ulong earlyBlock = ((blocksPerYear + genesis) * yearIndex) - 100;
             
@@ -205,6 +205,221 @@ namespace OpdexTokenTests
             token.Invoking(t => t.Distribute(new byte[0]))
                 .Should().Throw<SmartContractAssertException>()
                 .WithMessage("OPDEX: DISTRIBUTION_NOT_READY");
+        }
+
+        [Fact]
+        public void NominateLiquidityMiningPool_Success()
+        {
+            const ulong genesis = 100;
+            var token = CreateNewOpdexToken(Serializer.Serialize(DefaultOwnerSchedule), Serializer.Serialize(DefaultMiningSchedule), genesis);
+
+            SetupMessage(MiningGovernance, Pool1);
+            
+            PersistentState.SetContract(Pool1, true);
+            PersistentState.SetUInt256($"Balance:{Pool1}", genesis);
+
+            var notifyParams = new object[] {Pool1, genesis};
+            
+            SetupCall(MiningGovernance, 0ul, nameof(IOpdexMiningGovernance.NominateLiquidityPool), notifyParams, TransferResult.Transferred(null));
+
+            token.NominateLiquidityPool();
+
+            VerifyCall(MiningGovernance, 0ul, nameof(IOpdexMiningGovernance.NominateLiquidityPool), notifyParams, Times.Once);
+        }
+        
+        [Fact]
+        public void NominateLiquidityMiningPool_Throws_SenderIsNotContract()
+        {
+            const ulong genesis = 100;
+            var token = CreateNewOpdexToken(Serializer.Serialize(DefaultOwnerSchedule), Serializer.Serialize(DefaultMiningSchedule), genesis);
+
+            SetupMessage(MiningGovernance, Miner1);
+
+            token.Invoking(t => t.NominateLiquidityPool())
+                .Should()
+                .Throw<SmartContractAssertException>()
+                .WithMessage("OPDEX: INVALID_SENDER");
+        }
+        
+        [Fact]
+        public void NominateLiquidityMiningPool_FailsSilent_ZeroBalance()
+        {
+            const ulong genesis = 100;
+            var token = CreateNewOpdexToken(Serializer.Serialize(DefaultOwnerSchedule), Serializer.Serialize(DefaultMiningSchedule), genesis);
+
+            SetupMessage(MiningGovernance, Pool1);
+            
+            PersistentState.SetContract(Pool1, true);
+            PersistentState.SetUInt256($"Balance:{Pool1}", UInt256.Zero);
+
+            var notifyParams = new object[] {Pool1, UInt256.Zero};
+            
+            SetupCall(MiningGovernance, 0ul, nameof(IOpdexMiningGovernance.NominateLiquidityPool), notifyParams, TransferResult.Transferred(null));
+
+            token.NominateLiquidityPool();
+
+            VerifyCall(MiningGovernance, 0ul, nameof(IOpdexMiningGovernance.NominateLiquidityPool), notifyParams, Times.Never);
+        }
+
+        [Theory]
+        [InlineData(100, 50)]
+        [InlineData(100, 0)]
+        public void TransferFrom_Success(UInt256 ownerBalance, UInt256 spenderAllowance)
+        {
+            var token = CreateNewOpdexToken(Serializer.Serialize(DefaultOwnerSchedule), Serializer.Serialize(DefaultMiningSchedule));
+
+            SetupMessage(MiningGovernance, Pool1);
+            
+            PersistentState.SetUInt256($"Balance:{Miner1}", ownerBalance);
+            PersistentState.SetUInt256($"Allowance:{Miner1}:{Pool1}", spenderAllowance);
+
+            token.TransferFrom(Miner1, Owner, spenderAllowance).Should().BeTrue();
+
+            VerifyLog(new TransferLog
+            {
+                From = Miner1,
+                To = Owner,
+                Amount = spenderAllowance
+            }, Times.Once);
+        }
+        
+        [Fact]
+        public void TransferFrom_Fails_InvalidAllowance()
+        {
+            UInt256 ownerBalance = 100;
+            UInt256 spenderAllowance = 150;
+            
+            var token = CreateNewOpdexToken(Serializer.Serialize(DefaultOwnerSchedule), Serializer.Serialize(DefaultMiningSchedule));
+
+            SetupMessage(MiningGovernance, Pool1);
+            
+            PersistentState.SetUInt256($"Balance:{Miner1}", ownerBalance);
+            PersistentState.SetUInt256($"Allowance:{Miner1}:{Pool1}", spenderAllowance);
+
+            token.TransferFrom(Miner1, Owner, spenderAllowance + 1).Should().BeFalse();
+
+            VerifyLog(new TransferLog
+            {
+                From = Miner1,
+                To = Owner,
+                Amount = spenderAllowance
+            }, Times.Never);
+        }
+        
+        [Fact]
+        public void TransferFrom_Fails_InvalidOwnerAmount()
+        {
+            UInt256 ownerBalance = 100;
+            UInt256 spenderAllowance = 150;
+            
+            var token = CreateNewOpdexToken(Serializer.Serialize(DefaultOwnerSchedule), Serializer.Serialize(DefaultMiningSchedule));
+
+            SetupMessage(MiningGovernance, Pool1);
+            
+            PersistentState.SetUInt256($"Balance:{Miner1}", ownerBalance);
+            PersistentState.SetUInt256($"Allowance:{Miner1}:{Pool1}", spenderAllowance);
+
+            token.TransferFrom(Miner1, Owner, spenderAllowance).Should().BeFalse();
+
+            VerifyLog(new TransferLog
+            {
+                From = Miner1,
+                To = Owner,
+                Amount = spenderAllowance
+            }, Times.Never);
+        }
+        
+        [Theory]
+        [InlineData(100, 50)]
+        [InlineData(100, 0)]
+        public void TransferTo_Success(UInt256 ownerBalance, UInt256 transferAmount)
+        {
+            var token = CreateNewOpdexToken(Serializer.Serialize(DefaultOwnerSchedule), Serializer.Serialize(DefaultMiningSchedule));
+
+            SetupMessage(MiningGovernance, Miner1);
+            
+            PersistentState.SetUInt256($"Balance:{Miner1}", ownerBalance);
+
+            token.TransferTo(Owner, transferAmount).Should().BeTrue();
+
+            VerifyLog(new TransferLog
+            {
+                From = Miner1,
+                To = Owner,
+                Amount = transferAmount
+            }, Times.Once);
+        }
+        
+        [Fact]
+        public void TransferTo_Fails_InvalidOwnerAmount()
+        {
+            UInt256 ownerBalance = 100;
+            UInt256 transferAmount = 150;
+            
+            var token = CreateNewOpdexToken(Serializer.Serialize(DefaultOwnerSchedule), Serializer.Serialize(DefaultMiningSchedule));
+
+            SetupMessage(MiningGovernance, Miner1);
+            
+            PersistentState.SetUInt256($"Balance:{Miner1}", ownerBalance);
+
+            token.TransferTo(Owner, transferAmount).Should().BeFalse();
+
+            VerifyLog(new TransferLog
+            {
+                From = Miner1,
+                To = Owner,
+                Amount = transferAmount
+            }, Times.Never);
+        }
+
+        [Fact]
+        public void Approve_Success()
+        {
+            UInt256 ownerBalance = 100;
+            UInt256 currentAmount = 50;
+            UInt256 amount = 100;
+            
+            var token = CreateNewOpdexToken(Serializer.Serialize(DefaultOwnerSchedule), Serializer.Serialize(DefaultMiningSchedule));
+
+            SetupMessage(MiningGovernance, Miner1);
+            
+            PersistentState.SetUInt256($"Balance:{Miner1}", ownerBalance);
+            PersistentState.SetUInt256($"Allowance:{Miner1}:{Owner}", currentAmount);
+
+            token.Approve(Owner, currentAmount, amount).Should().BeTrue();
+
+            VerifyLog(new ApprovalLog
+            {
+                Owner = Miner1,
+                Spender = Owner,
+                Amount = amount,
+                OldAmount = currentAmount
+            }, Times.Once);
+        }
+
+        [Fact]
+        public void Approve_Fail_InvalidCurrentAmount()
+        {
+            UInt256 ownerBalance = 100;
+            UInt256 currentAmount = 50;
+            UInt256 amount = 100;
+            
+            var token = CreateNewOpdexToken(Serializer.Serialize(DefaultOwnerSchedule), Serializer.Serialize(DefaultMiningSchedule));
+
+            SetupMessage(MiningGovernance, Miner1);
+            
+            PersistentState.SetUInt256($"Balance:{Miner1}", ownerBalance);
+            PersistentState.SetUInt256($"Allowance:{Miner1}:{Owner}", 0);
+
+            token.Approve(Owner, currentAmount, amount).Should().BeFalse();
+
+            VerifyLog(new ApprovalLog
+            {
+                Owner = Miner1,
+                Spender = Owner,
+                Amount = amount,
+                OldAmount = currentAmount
+            }, Times.Never);
         }
 
         [Fact]
