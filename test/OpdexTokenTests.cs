@@ -87,6 +87,12 @@ namespace OpdexTokenTests
             token.SetOwner(MiningGovernance);
 
             token.Owner.Should().Be(MiningGovernance);
+
+            VerifyLog(new OwnerChangeLog
+            {
+                From = Owner,
+                To = MiningGovernance
+            }, Times.Once);
         }
         
         [Fact]
@@ -126,7 +132,7 @@ namespace OpdexTokenTests
 
             VerifyCreate<OpdexMiningGovernance>(0ul, createParams, Times.Once);
             VerifyCall(MiningGovernance, 0ul, nameof(IOpdexMiningGovernance.NotifyDistribution), callParams, Times.Once);
-            VerifyLog(new DistributionEvent
+            VerifyLog(new DistributionLog
             {
                 OwnerAddress = Owner,
                 MiningAddress = MiningGovernance,
@@ -176,7 +182,7 @@ namespace OpdexTokenTests
             
             VerifyCall(MiningGovernance, 0ul, nameof(IOpdexMiningGovernance.NotifyDistribution), notifyParams, Times.Once);
             
-            VerifyLog(new DistributionEvent
+            VerifyLog(new DistributionLog
             {
                 OwnerAddress = Owner,
                 MiningAddress = MiningGovernance,

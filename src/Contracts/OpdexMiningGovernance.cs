@@ -146,7 +146,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
 
         Nominations = nominations;
         
-        Log(new NominationEvent
+        Log(new NominationLog
         {
             StakingPool = nomination.StakingPool, 
             Weight = nomination.Weight, 
@@ -214,7 +214,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
 
         Assert(Call(miningPool, 0, nameof(IOpdexMiningPool.NotifyRewardAmount)).Success);
         
-        Log(new MiningPoolRewardedEvent
+        Log(new RewardMiningPoolLog
         {
             StakingPool = nomination.StakingPool,
             MiningPool = miningPool,
@@ -253,7 +253,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
         
         SetMiningPool(stakingPool, miningPool);
         
-        Log(new MiningPoolCreatedEvent { MiningPool = miningPool, StakingPool = stakingPool });
+        Log(new MiningPoolCreatedLog { MiningPool = miningPool, StakingPool = stakingPool });
 
         return miningPool;
     }

@@ -154,7 +154,7 @@ public class OpdexToken : SmartContract, IOpdexToken
         TotalSupply += supplyIncrease;
         YearIndex++;
         
-        Log(new DistributionEvent
+        Log(new DistributionLog
         {
             OwnerAddress = owner,
             MiningAddress = miningGov,
@@ -171,7 +171,7 @@ public class OpdexToken : SmartContract, IOpdexToken
         
         Owner = owner;
         
-        Log(new OwnerChangeEvent { From = Message.Sender, To = owner });
+        Log(new OwnerChangeLog { From = Message.Sender, To = owner });
     }
     
     /// <inheritdoc />

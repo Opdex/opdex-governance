@@ -167,7 +167,7 @@ public class OpdexMiningPool : SmartContract, IOpdexMiningPool
         
         UpdateReward(Message.Sender);
         
-        Assert(amount > 0, "OPDEX: CANNOT_STAKE_ZERO");
+        Assert(amount > 0, "OPDEX: CANNOT_MINE_ZERO");
         
         TotalSupply += amount;
         
@@ -175,7 +175,7 @@ public class OpdexMiningPool : SmartContract, IOpdexMiningPool
 
         SafeTransferFrom(StakingToken, Message.Sender, Address, amount);
 
-        Log(new StakedEvent { To = Message.Sender, Amount = amount });
+        Log(new EnterMiningPoolLog { Miner = Message.Sender, Amount = amount });
         
         Unlock();
     }
@@ -195,7 +195,7 @@ public class OpdexMiningPool : SmartContract, IOpdexMiningPool
         
         SafeTransferTo(StakingToken, Message.Sender, amount);
         
-        Log(new WithdrawnEvent { To = Message.Sender, Amount = amount });
+        Log(new ExitMiningPoolLog { Miner = Message.Sender, Amount = amount });
         
         Unlock();
     }
@@ -215,7 +215,7 @@ public class OpdexMiningPool : SmartContract, IOpdexMiningPool
             
             SafeTransferTo(MinedToken, Message.Sender, reward);
             
-            Log(new RewardPaidEvent { To = Message.Sender, Amount = reward });
+            Log(new CollectMiningRewardsLog { Miner = Message.Sender, Amount = reward });
         }
         
         Unlock();
@@ -257,7 +257,7 @@ public class OpdexMiningPool : SmartContract, IOpdexMiningPool
         LastUpdateBlock = Block.Number;
         MiningPeriodEndBlock = Block.Number + MiningDuration;
         
-        Log(new RewardAddedEvent { Reward = reward });
+        Log(new MiningPoolRewardedLog { Amount = reward });
         
         Unlock();
     }

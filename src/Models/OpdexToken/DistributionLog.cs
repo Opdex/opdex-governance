@@ -1,6 +1,6 @@
 using Stratis.SmartContracts;
 
-public struct DistributionEvent
+public struct DistributionLog
 {
     [Index] public Address OwnerAddress;
     [Index] public Address MiningAddress;

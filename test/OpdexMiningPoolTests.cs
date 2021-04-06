@@ -116,7 +116,7 @@ namespace OpdexTokenTests
             staking.GetRewardPerTokenPaid(Miner1).Should().Be(userRewardPerTokenPaid);
 
             VerifyCall(Pool1, 0ul, "TransferFrom", transferParams, Times.Once);
-            VerifyLog(new StakedEvent { To = Miner1, Amount = amount }, Times.Once);
+            VerifyLog(new EnterMiningPoolLog { Miner = Miner1, Amount = amount }, Times.Once);
         }
 
         [Theory]
@@ -149,7 +149,7 @@ namespace OpdexTokenTests
             staking.GetBalance(Miner1).Should().Be(UInt256.Zero);
             
             VerifyCall(Pool1, 0ul, "TransferTo", transferToParams, Times.Once);
-            VerifyLog(new WithdrawnEvent { To = Miner1, Amount = amount }, Times.Once);
+            VerifyLog(new ExitMiningPoolLog { Miner = Miner1, Amount = amount }, Times.Once);
         }
 
         [Theory]
@@ -187,7 +187,7 @@ namespace OpdexTokenTests
             staking.Collect();
             
             VerifyCall(OPDX, 0ul, "TransferTo", transferToRewardParams, Times.Once);
-            VerifyLog(new RewardPaidEvent { To = Miner1, Amount = reward }, Times.Once);
+            VerifyLog(new CollectMiningRewardsLog { Miner = Miner1, Amount = reward }, Times.Once);
         }
 
         [Fact]

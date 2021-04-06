@@ -75,16 +75,16 @@ namespace OpdexTokenTests
 
             // Assert
             VerifyCreate<OpdexMiningPool>(0ul, miningPool1Params, Times.Once);
-            VerifyLog(new MiningPoolCreatedEvent {MiningPool = MiningPool1, StakingPool = Pool1}, Times.Once);
+            VerifyLog(new MiningPoolCreatedLog {MiningPool = MiningPool1, StakingPool = Pool1}, Times.Once);
             
             VerifyCreate<OpdexMiningPool>(0ul, miningPool2Params, Times.Once);
-            VerifyLog(new MiningPoolCreatedEvent {MiningPool = MiningPool2, StakingPool = Pool2}, Times.Once);
+            VerifyLog(new MiningPoolCreatedLog {MiningPool = MiningPool2, StakingPool = Pool2}, Times.Once);
             
             VerifyCreate<OpdexMiningPool>(0ul, miningPool3Params, Times.Once);
-            VerifyLog(new MiningPoolCreatedEvent {MiningPool = MiningPool3, StakingPool = Pool3}, Times.Once);
+            VerifyLog(new MiningPoolCreatedLog {MiningPool = MiningPool3, StakingPool = Pool3}, Times.Once);
             
             VerifyCreate<OpdexMiningPool>(0ul, miningPool4Params, Times.Once);
-            VerifyLog(new MiningPoolCreatedEvent {MiningPool = MiningPool4, StakingPool = Pool4}, Times.Once);
+            VerifyLog(new MiningPoolCreatedLog {MiningPool = MiningPool4, StakingPool = Pool4}, Times.Once);
             
             VerifyCall(OPDX, 0ul, nameof(IOpdexToken.GetBalance), getBalanceParams, Times.Once);
         }
@@ -148,13 +148,13 @@ namespace OpdexTokenTests
             
             VerifyCreate<OpdexMiningPool>(0ul, miningPool1Params, Times.Once);
             
-            VerifyLog(new MiningPoolCreatedEvent
+            VerifyLog(new MiningPoolCreatedLog
             {
                 MiningPool = MiningPool1, 
                 StakingPool = Pool1
             }, Times.Once);
 
-            VerifyLog(new NominationEvent
+            VerifyLog(new NominationLog
             {
                 StakingPool = Pool1,
                 Weight = 100_000_000,
@@ -187,13 +187,13 @@ namespace OpdexTokenTests
             
             VerifyCreate<OpdexMiningPool>(0ul, miningPool4Params, Times.Once);
             
-            VerifyLog(new MiningPoolCreatedEvent
+            VerifyLog(new MiningPoolCreatedLog
             {
                 MiningPool = MiningPool4, 
                 StakingPool = Pool4
             }, Times.Once);
 
-            VerifyLog(new NominationEvent
+            VerifyLog(new NominationLog
             {
                 StakingPool = Pool4,
                 Weight = 100_000_000,
@@ -223,7 +223,7 @@ namespace OpdexTokenTests
             gov.Nominations.Length.Should().Be(3);
             gov.Nominations[2].Weight.Should().Be((UInt256)100_000_000);
 
-            VerifyLog(new NominationEvent
+            VerifyLog(new NominationLog
             {
                 StakingPool = Pool3,
                 Weight = 100_000_000,
@@ -260,13 +260,13 @@ namespace OpdexTokenTests
             
             VerifyCreate<OpdexMiningPool>(0ul, miningPool5Params, Times.Once);
             
-            VerifyLog(new MiningPoolCreatedEvent
+            VerifyLog(new MiningPoolCreatedLog
             {
                 MiningPool = MiningPool5, 
                 StakingPool = Pool5
             }, Times.Once);
 
-            VerifyLog(new NominationEvent
+            VerifyLog(new NominationLog
             {
                 StakingPool = Pool5,
                 Weight = 100_000_000,
@@ -300,7 +300,7 @@ namespace OpdexTokenTests
                 gov.Nominations[i].Weight.Should().Be(nominations[i].Weight);
             }
 
-            VerifyLog(new NominationEvent
+            VerifyLog(new NominationLog
             {
                 StakingPool = It.IsAny<Address>(),
                 Weight = It.IsAny<UInt256>(),
@@ -359,7 +359,7 @@ namespace OpdexTokenTests
             VerifyCall(OPDX, 0ul, nameof(IOpdexToken.TransferTo), transferToParams, Times.Once);
             VerifyCall(MiningPool1, 0ul, nameof(IOpdexMiningPool.NotifyRewardAmount), null, Times.Once);
 
-            VerifyLog(new MiningPoolRewardedEvent
+            VerifyLog(new RewardMiningPoolLog
             {
                 StakingPool = Pool1,
                 MiningPool = MiningPool1,
@@ -417,7 +417,7 @@ namespace OpdexTokenTests
             VerifyCall(MiningPool4, 0ul, nameof(IOpdexMiningPool.NotifyRewardAmount), null, Times.Once);
             VerifyCall(OPDX, 0ul, nameof(IOpdexToken.GetBalance), getBalanceParams, Times.Once);
 
-            VerifyLog(new MiningPoolRewardedEvent
+            VerifyLog(new RewardMiningPoolLog
             {
                 StakingPool = Pool4,
                 MiningPool = MiningPool4,
@@ -533,10 +533,10 @@ namespace OpdexTokenTests
             VerifyCall(MiningPool3, 0ul, nameof(IOpdexMiningPool.NotifyRewardAmount), null, Times.Once);
             VerifyCall(MiningPool4, 0ul, nameof(IOpdexMiningPool.NotifyRewardAmount), null, Times.Once);
 
-            VerifyLog(new MiningPoolRewardedEvent { StakingPool = Pool1, MiningPool = MiningPool1, Amount = miningPoolReward }, Times.Once);
-            VerifyLog(new MiningPoolRewardedEvent { StakingPool = Pool2, MiningPool = MiningPool2, Amount = miningPoolReward }, Times.Once);
-            VerifyLog(new MiningPoolRewardedEvent { StakingPool = Pool3, MiningPool = MiningPool3, Amount = miningPoolReward }, Times.Once);
-            VerifyLog(new MiningPoolRewardedEvent { StakingPool = Pool4, MiningPool = MiningPool4, Amount = miningPoolReward }, Times.Once);
+            VerifyLog(new RewardMiningPoolLog { StakingPool = Pool1, MiningPool = MiningPool1, Amount = miningPoolReward }, Times.Once);
+            VerifyLog(new RewardMiningPoolLog { StakingPool = Pool2, MiningPool = MiningPool2, Amount = miningPoolReward }, Times.Once);
+            VerifyLog(new RewardMiningPoolLog { StakingPool = Pool3, MiningPool = MiningPool3, Amount = miningPoolReward }, Times.Once);
+            VerifyLog(new RewardMiningPoolLog { StakingPool = Pool4, MiningPool = MiningPool4, Amount = miningPoolReward }, Times.Once);
         }
         
         [Fact]
@@ -594,9 +594,9 @@ namespace OpdexTokenTests
             VerifyCall(MiningPool3, 0ul, nameof(IOpdexMiningPool.NotifyRewardAmount), null, Times.Once);
             VerifyCall(MiningPool4, 0ul, nameof(IOpdexMiningPool.NotifyRewardAmount), null, Times.Once);
             
-            VerifyLog(new MiningPoolRewardedEvent { StakingPool = Pool2, MiningPool = MiningPool2, Amount = miningPoolReward }, Times.Once);
-            VerifyLog(new MiningPoolRewardedEvent { StakingPool = Pool3, MiningPool = MiningPool3, Amount = miningPoolReward }, Times.Once);
-            VerifyLog(new MiningPoolRewardedEvent { StakingPool = Pool4, MiningPool = MiningPool4, Amount = miningPoolReward }, Times.Once);
+            VerifyLog(new RewardMiningPoolLog { StakingPool = Pool2, MiningPool = MiningPool2, Amount = miningPoolReward }, Times.Once);
+            VerifyLog(new RewardMiningPoolLog { StakingPool = Pool3, MiningPool = MiningPool3, Amount = miningPoolReward }, Times.Once);
+            VerifyLog(new RewardMiningPoolLog { StakingPool = Pool4, MiningPool = MiningPool4, Amount = miningPoolReward }, Times.Once);
         }
         
         [Fact]
@@ -669,10 +669,10 @@ namespace OpdexTokenTests
             
             VerifyCall(OPDX, 0ul, nameof(IOpdexToken.GetBalance), getBalanceParams, Times.Once);
 
-            VerifyLog(new MiningPoolRewardedEvent { StakingPool = Pool1, MiningPool = MiningPool1, Amount = miningPoolReward }, Times.Once);
-            VerifyLog(new MiningPoolRewardedEvent { StakingPool = Pool2, MiningPool = MiningPool2, Amount = miningPoolReward }, Times.Once);
-            VerifyLog(new MiningPoolRewardedEvent { StakingPool = Pool3, MiningPool = MiningPool3, Amount = miningPoolReward }, Times.Once);
-            VerifyLog(new MiningPoolRewardedEvent { StakingPool = Pool4, MiningPool = MiningPool4, Amount = miningPoolReward }, Times.Once);
+            VerifyLog(new RewardMiningPoolLog { StakingPool = Pool1, MiningPool = MiningPool1, Amount = miningPoolReward }, Times.Once);
+            VerifyLog(new RewardMiningPoolLog { StakingPool = Pool2, MiningPool = MiningPool2, Amount = miningPoolReward }, Times.Once);
+            VerifyLog(new RewardMiningPoolLog { StakingPool = Pool3, MiningPool = MiningPool3, Amount = miningPoolReward }, Times.Once);
+            VerifyLog(new RewardMiningPoolLog { StakingPool = Pool4, MiningPool = MiningPool4, Amount = miningPoolReward }, Times.Once);
         }
         
         #endregion
