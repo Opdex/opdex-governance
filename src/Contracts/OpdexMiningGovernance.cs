@@ -220,7 +220,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
         
         SafeTransferTo(MinedToken, miningPool, reward);
 
-        Assert(Call(miningPool, 0, nameof(IOpdexMiningPool.NotifyRewardAmount)).Success);
+        Assert(Call(miningPool, 0, nameof(IOpdexMiningPool.NotifyRewardAmount), new object[] { reward }).Success);
         
         Log(new RewardMiningPoolLog
         {

@@ -1,16 +1,22 @@
+using System;
 using FluentAssertions;
 using Moq;
 using OpdexTokenTests.Base;
 using Stratis.SmartContracts;
 using Stratis.SmartContracts.CLR;
+using Stratis.SmartContracts.Core;
 using Xunit;
 
 namespace OpdexTokenTests
 {
     public class OpdexTokenTests : TestBase
     {
-        private readonly UInt256[] DefaultOwnerSchedule = { 120_000_000, 90_000_000, 60_000_000, 30_000_000, 7_500_000 };
-        private readonly UInt256[] DefaultMiningSchedule = { 280_000_000, 210_000_000, 140_000_000, 70_000_000, 17_500_000 };
+        
+        // 120M, 90M, 60M, 30M, 7.5M
+        private readonly UInt256[] DefaultOwnerSchedule = { 12_000_000_000_000_000, 90_000_00000_000_000, 60_000_00000_000_000, 30_000_00000_000_000, 7_500_00000_000_000 };
+        
+        // 280M, 210M, 140M, 70M, 17.5M
+        private readonly UInt256[] DefaultMiningSchedule = { 280_000_00000_000_000, 210_000_00000_000_000, 140_000_00000_000_000, 70_000_00000_000_000, 17_500_00000_000_000 };
         
         [Fact]
         public void CreateContract_Success()
@@ -128,7 +134,7 @@ namespace OpdexTokenTests
             token.GetBalance(Owner).Should().Be(DefaultOwnerSchedule[0]);
             token.GetBalance(MiningGovernance).Should().Be(DefaultMiningSchedule[0]);
             token.PeriodIndex.Should().Be(1);
-            token.TotalSupply.Should().Be((UInt256)400_000_000);
+            token.TotalSupply.Should().Be((UInt256)40_000_000_000_000_000);
 
             VerifyCreate<OpdexMiningGovernance>(0ul, createParams, Times.Once);
             VerifyCall(MiningGovernance, 0ul, nameof(IOpdexMiningGovernance.NotifyDistribution), callParams, Times.Once);
@@ -143,12 +149,12 @@ namespace OpdexTokenTests
         }
 
         [Theory]
-        [InlineData(1, 120_000_000, 280_000_000, 400_000_000, 210_000_000, 490_000_000, 700_000_000)]
-        [InlineData(2, 210_000_000, 490_000_000, 700_000_000, 270_000_000, 630_000_000, 900_000_000)]
-        [InlineData(3, 270_000_000, 630_000_000, 900_000_000, 300_000_000, 700_000_000, 1_000_000_000)]
-        [InlineData(4, 300_000_000, 700_000_000, 1_000_000_000, 307_500_000, 717_500_000, 1_025_000_000)]
-        [InlineData(5, 307_500_000, 717_500_000, 1_025_000_000, 315_000_000, 735_000_000, 1_050_000_000)]
-        [InlineData(6, 315_000_000, 735_000_000, 1_050_000_000, 322_500_000, 752_500_000, 1_075_000_000)]
+        [InlineData(1, 12_000_000_000_000_000, 28_000_000_000_000_000, 40_000_000_000_000_000, 21_000_000_000_000_000, 49_000_000_000_000_000, 70_000_000_000_000_000)]
+        [InlineData(2, 21_000_000_000_000_000, 49_000_000_000_000_000, 70_000_000_000_000_000, 27_000_000_000_000_000, 63_000_000_000_000_000, 90_000_000_000_000_000)]
+        [InlineData(3, 27_000_000_000_000_000, 63_000_000_000_000_000, 90_000_000_000_000_000, 30_000_000_000_000_000, 70_000_000_000_000_000, 1_00_000_000_000_000_000)]
+        [InlineData(4, 30_000_000_000_000_000, 70_000_000_000_000_000, 100_000_000_000_000_000, 30_750_000_000_000_000, 71_750_000_000_000_000, 102_500_000_000_000_000)]
+        [InlineData(5, 30_750_000_000_000_000, 71_750_000_000_000_000, 102_500_000_000_000_000, 31_500_000_000_000_000,73_500_000_000_000_000, 1_05_000_000_000_000_000)]
+        [InlineData(6, 31_500_000_000_000_000, 73_500_000_000_000_000, 1_05_000_000_000_000_000, 32_250_000_000_000_000, 75_250_000_000_000_000, 107_500_000_000_000_000)]
         public void Distribute_SubsequentYears_Success(uint periodIndex, UInt256 currentOwnerBalance, UInt256 currentMiningBalance, UInt256 currentTotalSupply,
             UInt256 expectedOwnerBalance, UInt256 expectedMiningBalance, UInt256 expectedTotalSupply)
         {
@@ -451,11 +457,11 @@ namespace OpdexTokenTests
             }, Times.Never);
         }
 
-        // [Fact]
-        // public void Serialize_Distribution_Schedules()
-        // {
-        //     Console.WriteLine(Serializer.Serialize(DefaultOwnerSchedule).ToHexString());
-        //     Console.WriteLine(Serializer.Serialize(DefaultMiningSchedule).ToHexString());
-        // }
+        [Fact]
+        public void Serialize_Distribution_Schedules()
+        {
+            Console.WriteLine(Serializer.Serialize(DefaultOwnerSchedule).ToHexString());
+            Console.WriteLine(Serializer.Serialize(DefaultMiningSchedule).ToHexString());
+        }
     }
 }
