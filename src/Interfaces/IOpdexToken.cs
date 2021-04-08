@@ -14,12 +14,12 @@ public interface IOpdexToken : IStandardToken256
     Address MiningGovernance { get; }
     
     /// <summary>
-    /// THe yearly scheduled amounts to mint to the owner.
+    /// The scheduled amounts to mint to the owner.
     /// </summary>
     UInt256[] OwnerSchedule { get; }
     
     /// <summary>
-    /// The yearly scheduled amounts to mint for mining.
+    /// The scheduled amounts to mint for mining.
     /// </summary>
     UInt256[] MiningSchedule { get; }
     
@@ -29,9 +29,14 @@ public interface IOpdexToken : IStandardToken256
     ulong Genesis { get; }
     
     /// <summary>
-    /// The current year index distributed.
+    /// The number of periods that have been distributed.
     /// </summary>
-    uint YearIndex { get; }
+    uint PeriodIndex { get; }
+    
+    /// <summary>
+    /// The number of blocks between token distribution periods.
+    /// </summary>
+    ulong PeriodDuration { get; }
     
     /// <summary>
     /// The token symbol.
@@ -44,7 +49,7 @@ public interface IOpdexToken : IStandardToken256
     string Name { get; }
     
     /// <summary>
-    /// Mints and distributes tokens yearly according to the Owner and Mining schedules.
+    /// Mints and distributes tokens according to the owner and mining period schedules.
     /// </summary>
     /// <param name="data">
     /// Serialized Address[] of initial staking pools to be granted funds for liquidity mining.

@@ -5,7 +5,6 @@ using Stratis.Bitcoin.Features.PoA;
 using Stratis.SmartContracts;
 using Stratis.SmartContracts.CLR;
 using Stratis.SmartContracts.CLR.Serialization;
-using Stratis.SmartContracts.Networks;
 
 namespace OpdexTokenTests.Base
 {
@@ -32,14 +31,16 @@ namespace OpdexTokenTests.Base
         protected readonly Address Pool4;
         protected readonly Address Pool5;
         protected readonly InMemoryState PersistentState;
+        protected const ulong BlocksPerYear = 60 * 60 * 24 * 365 / 16;
+        protected const ulong BlocksPerMonth = BlocksPerYear / 12;
 
         protected TestBase()
         {
             PersistentState = new InMemoryState();
+            Serializer = new Serializer(new ContractPrimitiveSerializer(new PoANetwork()));
             _mockContractLogger = new Mock<IContractLogger>();
             _mockContractState = new Mock<ISmartContractState>();
             _mockInternalExecutor = new Mock<IInternalTransactionExecutor>();
-            Serializer = new Serializer(new ContractPrimitiveSerializer(new PoANetwork()));
             _mockContractState.Setup(x => x.PersistentState).Returns(PersistentState);
             _mockContractState.Setup(x => x.ContractLogger).Returns(_mockContractLogger.Object);
             _mockContractState.Setup(x => x.InternalTransactionExecutor).Returns(_mockInternalExecutor.Object);
@@ -69,7 +70,7 @@ namespace OpdexTokenTests.Base
             
             SetupBalance(0);
             
-            return new OpdexMiningGovernance(_mockContractState.Object, OPDX);
+            return new OpdexMiningGovernance(_mockContractState.Object, OPDX, BlocksPerMonth);
         }
         
         protected IOpdexToken CreateNewOpdexToken(byte[]ownerSchedule, byte[] miningSchedule, ulong block = 10)
@@ -78,9 +79,9 @@ namespace OpdexTokenTests.Base
             
             SetupBalance(0);
             SetupBlock(block);
-            SetupCreate<OpdexMiningGovernance>(CreateResult.Succeeded(MiningGovernance), 0ul, new object[] {OPDX});
+            SetupCreate<OpdexMiningGovernance>(CreateResult.Succeeded(MiningGovernance), 0ul, new object[] {OPDX, BlocksPerMonth});
             
-            return new OpdexToken(_mockContractState.Object, ownerSchedule, miningSchedule);
+            return new OpdexToken(_mockContractState.Object, ownerSchedule, miningSchedule, BlocksPerYear);
         }
 
         protected IOpdexMiningPool CreateNewMiningPool(ulong block = 10)
@@ -90,13 +91,13 @@ namespace OpdexTokenTests.Base
             SetupBalance(0);
             SetupBlock(block);
             
-            return new OpdexMiningPool(_mockContractState.Object, MiningGovernance, OPDX, Pool1);
+            return new OpdexMiningPool(_mockContractState.Object, MiningGovernance, OPDX, Pool1, BlocksPerMonth);
         }
 
         protected void SetupMessage(Address contractAddress, Address sender, ulong value = 0)
         {
             _mockContractState.Setup(x => x.Message).Returns(new Message(contractAddress, sender, value));
-            var balance = _mockContractState.Object.GetBalance();
+            var balance = value > 0 ? _mockContractState.Object.GetBalance() : 0;
             SetupBalance(balance + value);
         }
 

@@ -3,13 +3,12 @@ using Stratis.SmartContracts;
 using Stratis.SmartContracts.Standards;
 
 /// <summary>
-/// 
+/// Mining governance contract responsible for holding and distributing Opdex tokens to be mined within individual
+/// mining pools based on a liquidity pool nomination by Opdex token staking weight. 
 /// </summary>
 public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
 {
     private const uint MaximumNominations = 4;
-    private const uint BlocksPerYear = 1_971_000;
-    private const uint OneMonthBlocks = BlocksPerYear / 12;
     private const uint MiningPoolsPerYear = 48;
         
     /// <summary>
@@ -17,10 +16,12 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
     /// </summary>
     /// <param name="state">Smart contract state.</param>
     /// <param name="minedToken">The address of the token being mined.</param>
-    public OpdexMiningGovernance(ISmartContractState state, Address minedToken) : base(state)
+    /// <param name="periodDuration">The nomination and mining period block duration.</param>
+    public OpdexMiningGovernance(ISmartContractState state, Address minedToken, ulong periodDuration) : base(state)
     {
         MinedToken = minedToken;
-        NominationPeriodEnd = OneMonthBlocks / 4 + Block.Number;
+        PeriodDuration = periodDuration;
+        NominationPeriodEnd = periodDuration / 4 + Block.Number;
         Nominations = new Nomination[0];
     }
 
@@ -32,10 +33,10 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
     }
 
     /// <inheritdoc />
-    public bool Distributed
+    public bool Notified
     {
-        get => State.GetBool(nameof(Distributed));
-        private set => State.SetBool(nameof(Distributed), value);
+        get => State.GetBool(nameof(Notified));
+        private set => State.SetBool(nameof(Notified), value);
     }
 
     /// <inheritdoc />
@@ -43,6 +44,13 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
     {
         get => State.GetArray<Nomination>(nameof(Nominations));
         private set => State.SetArray(nameof(Nominations), value);
+    }
+    
+    /// <inheritdoc />
+    public ulong PeriodDuration
+    {
+        get => State.GetUInt64(nameof(PeriodDuration));
+        private set => State.SetUInt64(nameof(PeriodDuration), value);
     }
 
     /// <inheritdoc />
@@ -90,7 +98,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
         EnsureUnlocked();
         EnsureSenderIsMinedToken();
 
-        Distributed = true;
+        Notified = true;
         
         if (data.Length > 0)
         {
@@ -155,7 +163,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
     }
 
     /// <inheritdoc />
-    public void NotifyMiningPools()
+    public void RewardMiningPools()
     {
         EnsureUnlocked();
         EnsureNominationPeriodEnded();
@@ -166,7 +174,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
         {
             if (nominations[i].StakingPool == Address.Zero) continue;
             
-            NotifyMiningPoolExecute(nominations[i], MiningPoolReward);
+            RewardMiningPoolExecute(nominations[i], MiningPoolReward);
             IncrementMiningPoolsFunded();
         }
 
@@ -176,7 +184,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
     }
     
     /// <inheritdoc />
-    public void NotifyMiningPool()
+    public void RewardMiningPool()
     {
         EnsureUnlocked();
         EnsureNominationPeriodEnded();
@@ -187,7 +195,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
         {
             if (nominations[i].StakingPool == Address.Zero) continue;
             
-            NotifyMiningPoolExecute(nominations[i], MiningPoolReward);
+            RewardMiningPoolExecute(nominations[i], MiningPoolReward);
             IncrementMiningPoolsFunded();
             
             if (i == MaximumNominations - 1)
@@ -206,7 +214,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
         Unlock();
     }
     
-    private void NotifyMiningPoolExecute(Nomination nomination, UInt256 reward)
+    private void RewardMiningPoolExecute(Nomination nomination, UInt256 reward)
     {
         var miningPool = GetMiningPool(nomination.StakingPool);
         
@@ -232,7 +240,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
 
     private void SetMiningPoolRewardAmountExecute()
     {
-        Assert(Distributed, "OPDEX: TOKEN_DISTRIBUTION_REQUIRED");
+        Assert(Notified, "OPDEX: TOKEN_DISTRIBUTION_REQUIRED");
 
         var balance = (UInt256)Call(MinedToken, 0ul, nameof(IStandardToken.GetBalance), new object[] {Address}).ReturnValue;
         
@@ -240,7 +248,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
 
         MiningPoolReward = balance / MiningPoolsPerYear;
         MiningPoolsFunded = 0;
-        Distributed = false;
+        Notified = false;
     }
     
     private Address Deploy(Address stakingPool)
@@ -249,7 +257,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
 
         if (miningPool != Address.Zero) return miningPool;
 
-        miningPool = Create<OpdexMiningPool>(0ul, new object[] { Address, MinedToken, stakingPool }).NewContractAddress;
+        miningPool = Create<OpdexMiningPool>(0ul, new object[] { Address, MinedToken, stakingPool, PeriodDuration }).NewContractAddress;
         
         SetMiningPool(stakingPool, miningPool);
         
@@ -261,7 +269,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
     private void ResetNominations()
     {
         Nominations = new Nomination[0];
-        NominationPeriodEnd = Block.Number + OneMonthBlocks;
+        NominationPeriodEnd = Block.Number + PeriodDuration;
     }
     
     private static uint LowestNominationWeightIndex(Nomination[] nominations)

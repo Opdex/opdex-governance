@@ -2,23 +2,31 @@ using Stratis.SmartContracts;
 using Stratis.SmartContracts.Standards;
 
 /// <summary>
-/// 
+/// Mining pool for staking Opdex liquidity pool tokens in order to earn new mined tokens.
 /// </summary>
 public class OpdexMiningPool : SmartContract, IOpdexMiningPool
 {
+    private const ulong SatsPerToken = 100_000_000;
+    
     /// <summary>
     /// Constructor initializing a mining pool contract.
     /// </summary>
     /// <param name="state">Smart contract state.</param>
-    /// <param name="miningGovernance"></param>
-    /// <param name="minedToken"></param>
-    /// <param name="stakingToken"></param>
-    public OpdexMiningPool(ISmartContractState state, Address miningGovernance, Address minedToken, Address stakingToken) : base(state)
+    /// <param name="miningGovernance">The mining governance address.</param>
+    /// <param name="minedToken">The address of the token being mined.</param>
+    /// <param name="stakingToken">The address of the liquidity pool token used for mining.</param>
+    /// <param name="miningDuration">The duration of the mining period.</param>
+    public OpdexMiningPool(
+        ISmartContractState state, 
+        Address miningGovernance, 
+        Address minedToken, 
+        Address stakingToken, 
+        ulong miningDuration) : base(state)
     {
         MiningGovernance = miningGovernance;
         MinedToken = minedToken;
         StakingToken = stakingToken;
-        MiningDuration = 328_500 - 41_062; // 8 weeks - 1 week
+        MiningDuration = miningDuration;
     }
 
     /// <inheritdoc />
@@ -110,7 +118,7 @@ public class OpdexMiningPool : SmartContract, IOpdexMiningPool
 
     private void SetReward(Address address, UInt256 reward)
     {
-        State.SetUInt256($"Rewards:{address}", reward);
+        State.SetUInt256($"Reward:{address}", reward);
     }
 
     /// <inheritdoc />
@@ -139,13 +147,13 @@ public class OpdexMiningPool : SmartContract, IOpdexMiningPool
     /// <inheritdoc />
     public UInt256 GetRewardPerToken()
     {
-        if (TotalSupply == 0) return RewardPerToken;
-
-        var blocksToUpdate = LatestBlockApplicable() - LastUpdateBlock;
+        var totalSupply = TotalSupply;
         
-        var result = RewardPerToken + ((blocksToUpdate * RewardRate * 100_000_000) / TotalSupply);
+        if (totalSupply == 0) return RewardPerToken;
 
-        return result;
+        var remainingRewards = (LatestBlockApplicable() - LastUpdateBlock) * RewardRate;
+        
+        return RewardPerToken + (remainingRewards * SatsPerToken / totalSupply);
     }
 
     /// <inheritdoc />
@@ -157,17 +165,16 @@ public class OpdexMiningPool : SmartContract, IOpdexMiningPool
         var remainingReward = rewardPerToken - addressRewardPaid;
         var reward = GetReward(address);
         
-        return balance * remainingReward / 100_000_000 + reward;
+        return reward + (balance * remainingReward / SatsPerToken);
     }
 
     /// <inheritdoc />
     public void Mine(UInt256 amount)
     {
         EnsureUnlocked();
-        
-        UpdateReward(Message.Sender);
-        
         Assert(amount > 0, "OPDEX: CANNOT_MINE_ZERO");
+
+        UpdateReward(Message.Sender);
         
         TotalSupply += amount;
         
@@ -181,14 +188,26 @@ public class OpdexMiningPool : SmartContract, IOpdexMiningPool
     }
 
     /// <inheritdoc />
-    public void Withdraw(UInt256 amount)
+    public void Collect()
     {
         EnsureUnlocked();
         
         UpdateReward(Message.Sender);
+
+        CollectExecute();
         
-        Assert(amount > 0, "OPDEX: CANNOT_WITHDRAW_ZERO");
-        
+        Unlock();
+    }
+
+    /// <inheritdoc />
+    public void Exit()
+    {
+        EnsureUnlocked();
+
+        UpdateReward(Message.Sender);
+
+        var amount = GetBalance(Message.Sender);
+
         TotalSupply -= amount;
         
         SetBalance(Message.Sender, GetBalance(Message.Sender) - amount);
@@ -197,16 +216,49 @@ public class OpdexMiningPool : SmartContract, IOpdexMiningPool
         
         Log(new ExitMiningPoolLog { Miner = Message.Sender, Amount = amount });
         
+        CollectExecute();
+        
+        Unlock();
+    }
+    
+    /// <inheritdoc />
+    public void NotifyRewardAmount(UInt256 reward)
+    {
+        EnsureUnlocked();
+        Assert(Message.Sender == MiningGovernance, "OPDEX: UNAUTHORIZED");
+        
+        UpdateReward(Address.Zero);
+
+        var miningDuration = MiningDuration;
+        
+        if (Block.Number >= MiningPeriodEndBlock)
+        {
+            RewardRate = reward / miningDuration;
+        }
+        else
+        {
+            var remaining = MiningPeriodEndBlock - Block.Number;
+            var leftover = remaining * RewardRate;
+            
+            RewardRate = (reward + leftover) / miningDuration;
+        }
+
+        var balanceResult = Call(MinedToken, 0, nameof(IStandardToken.GetBalance), new object[] {Address});
+        var balance = (UInt256)balanceResult.ReturnValue;
+        
+        Assert(balanceResult.Success && balance > 0, "OPDEX: INVALID_BALANCE");
+        Assert(RewardRate <= balance / miningDuration, "OPDEX: PROVIDED_REWARD_TOO_HIGH");
+
+        LastUpdateBlock = Block.Number;
+        MiningPeriodEndBlock = Block.Number + miningDuration;
+        
+        Log(new MiningPoolRewardedLog { Amount = reward });
+        
         Unlock();
     }
 
-    /// <inheritdoc />
-    public void Collect()
+    private void CollectExecute()
     {
-        EnsureUnlocked();
-        
-        UpdateReward(Message.Sender);
-
         var reward = GetReward(Message.Sender);
 
         if (reward > 0)
@@ -217,49 +269,6 @@ public class OpdexMiningPool : SmartContract, IOpdexMiningPool
             
             Log(new CollectMiningRewardsLog { Miner = Message.Sender, Amount = reward });
         }
-        
-        Unlock();
-    }
-
-    /// <inheritdoc />
-    public void ExitMining()
-    {
-        Withdraw(GetBalance(Message.Sender));
-        Collect();
-    }
-    
-    /// <inheritdoc />
-    public void NotifyRewardAmount(UInt256 reward)
-    {
-        EnsureUnlocked();
-        Assert(Message.Sender == MiningGovernance);
-        
-        UpdateReward(Address.Zero);
-        
-        if (Block.Number >= MiningPeriodEndBlock)
-        {
-            RewardRate = reward / MiningDuration;
-        }
-        else
-        {
-            var remaining = MiningPeriodEndBlock - Block.Number;
-            var leftover = remaining * RewardRate;
-            
-            RewardRate = reward + leftover / MiningDuration;
-        }
-
-        var balanceResult = Call(MinedToken, 0, nameof(IStandardToken.GetBalance), new object[] {Address});
-        var balance = (UInt256)balanceResult.ReturnValue;
-        
-        Assert(balanceResult.Success && balance > 0);
-        Assert(RewardRate <= balance / MiningDuration, "OPDEX: PROVIDED_REWARD_TOO_HIGH");
-
-        LastUpdateBlock = Block.Number;
-        MiningPeriodEndBlock = Block.Number + MiningDuration;
-        
-        Log(new MiningPoolRewardedLog { Amount = reward });
-        
-        Unlock();
     }
 
     private void UpdateReward(Address address)

@@ -18,7 +18,7 @@ OPDX to mine.
 
 ```c#
 /// <summary>
-/// Mints and distributes tokens yearly according to the Owner and Mining schedules.
+/// Mints and distributes tokens according to the owner and mining period schedules.
 /// </summary>
 /// <param name="data">
 /// Serialized Address[] of initial staking pools to be granted funds for liquidity mining.

@@ -3,7 +3,7 @@ using Stratis.SmartContracts;
 public interface IOpdexMiningGovernance
 {
     /// <summary>
-    /// The address of the token being mined (rewarded).
+    /// The address of the token being mined.
     /// </summary>
     Address MinedToken { get; }
         
@@ -13,13 +13,12 @@ public interface IOpdexMiningGovernance
     ulong NominationPeriodEnd { get; }
         
     /// <summary>
-    /// The index of the last rewarded bucket, to track how many liquidity
-    /// mining contracts have been deployed and funded on a per year basis.
+    /// The amount of times mining pools have been funded.
     /// </summary>
     uint MiningPoolsFunded { get; }
         
     /// <summary>
-    /// The amount of mined tokens to fund each liquidity mining contract.
+    /// The amount of tokens to reward to a mining pool contract.
     /// </summary>
     UInt256 MiningPoolReward { get; }
         
@@ -29,15 +28,20 @@ public interface IOpdexMiningGovernance
     bool Locked { get; }
     
     /// <summary>
-    /// Flag describing if tokens have been distributed to this contract and is ready for calculating the yearly
-    /// mining amounts. Resets back to false after yearly calculations.
+    /// Flag describing if tokens have been distributed to this contract and that this contract has been notified.
+    /// Used to allow or deny calculation of the next period's mining rewards per mining pool.
     /// </summary>
-    bool Distributed { get; }
+    bool Notified { get; }
         
     /// <summary>
-    /// Top 4 staking pool nominations by staking weight.
+    /// The top staking pool nominations by weight.
     /// </summary>
     Nomination[] Nominations { get; }
+    
+    /// <summary>
+    /// The number of blocks of each nomination/mining period.
+    /// </summary>
+    ulong PeriodDuration { get; }
 
     /// <summary>
     /// Retrieve the mining pool address by the liquidity pool token address. 
@@ -50,20 +54,20 @@ public interface IOpdexMiningGovernance
     /// Nominate a liquidity pool for liquidity mining based on staking weight.
     /// Only the MinedToken contract can make this call.
     /// </summary>
-    /// <param name="stakingToken">The address of the liquidity pool's and it's token.</param>
+    /// <param name="stakingToken">The address of the liquidity pool and it's token.</param>
     /// <param name="weight">The current balance of staked weight in the liquidity pool.</param>
     void NominateLiquidityPool(Address stakingToken, UInt256 weight);
         
     /// <summary>
-    /// Loops nominations, funds and notifies liquidity mining pool contracts of funding.
+    /// Loops nominations, rewards and notifies mining pool contracts of funding.
     /// </summary>
-    void NotifyMiningPools();
+    void RewardMiningPools();
         
     /// <summary>
-    /// Fallback for <see cref="NotifyMiningPools"/> if gas costs become too high.
-    /// Funds and notifies liquidity mining pool contracts of funding.
+    /// Fallback for <see cref="RewardMiningPools"/> if gas costs become too high.
+    /// Rewards and notifies liquidity mining pool contracts of funding.
     /// </summary>
-    void NotifyMiningPool();
+    void RewardMiningPool();
 
     /// <summary>
     /// Hook to notify this governance contract that funding from the token has been sent.

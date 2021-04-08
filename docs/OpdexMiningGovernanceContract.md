@@ -20,28 +20,28 @@ Address GetMiningPool(Address stakingToken);
 /// Nominate a liquidity pool for liquidity mining based on staking weight.
 /// Only the MinedToken contract can make this call.
 /// </summary>
-/// <param name="stakingToken">The address of the liquidity pool's and it's token.</param>
+/// <param name="stakingToken">The address of the liquidity pool and it's token.</param>
 /// <param name="weight">The current balance of staked weight in the liquidity pool.</param>
 void NominateLiquidityPool(Address stakingToken, UInt256 weight);
 ```
 
-## Notify Mining Pools
+## Reward Mining Pools
 
 ```c#
 /// <summary>
-/// Loops nominations, funds and notifies liquidity mining pool contracts of funding.
+/// Loops nominations, rewards and notifies mining pool contracts of funding.
 /// </summary>
-void NotifyMiningPools();
+void RewardMiningPools();
 ```
 
-## Notify Mining Pool
+## Reward Mining Pool
 
 ```c#
 /// <summary>
-/// Fallback for <see cref="NotifyMiningPools"/> if gas costs become too high.
-/// Funds and notifies liquidity mining pool contracts of funding.
+/// Fallback for <see cref="RewardMiningPools"/> if gas costs become too high.
+/// Rewards and notifies liquidity mining pool contracts of funding.
 /// </summary>
-void NotifyMiningPool();
+void RewardMiningPool();
 ```
 
 ## Notify Distribution

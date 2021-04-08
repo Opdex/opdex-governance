@@ -1,44 +1,60 @@
 ﻿using Stratis.SmartContracts;
 
 /// <summary>
-/// 
+/// Mining token contract, used for staking in Opdex liquidity pools. Distributes to owner and mining governance
+/// based on a specified duration between distributions.
 /// </summary>
 [Deploy]
 public class OpdexToken : SmartContract, IOpdexToken
 {
-    private const string TokenName = "Opdex";
-    private const string TokenSymbol = "OPDX";
-    private const byte TokenDecimals = 8;
-    private const ulong BlocksPerYear = 1_971_000; // based on 16 second blocks
-    
     /// <summary>
     /// Constructor initializing opdex token contract.
     /// </summary>
     /// <param name="state">Smart contract state.</param>
-    /// <param name="ownerDistribution"></param>
-    /// <param name="miningDistribution"></param>
-    public OpdexToken(ISmartContractState state, byte[] ownerDistribution, byte[] miningDistribution) : base(state)
+    /// <param name="ownerDistribution">Serialized UInt256 array of owner distribution amounts.</param>
+    /// <param name="miningDistribution">Serialized UInt256 array of mining distribution amounts.</param>
+    /// <param name="periodDuration">The period between token distributions</param>
+    public OpdexToken(ISmartContractState state, byte[] ownerDistribution, byte[] miningDistribution, ulong periodDuration) 
+        : base(state)
     {
         var ownerSchedule = Serializer.ToArray<UInt256>(ownerDistribution);
         var miningSchedule = Serializer.ToArray<UInt256>(miningDistribution);
 
         Assert(ownerSchedule.Length > 1 && ownerSchedule.Length == miningSchedule.Length);
 
+        Name = "Opdex";
+        Symbol = "OPDX";
+        Decimals = 8;
         Owner = Message.Sender;
         Genesis = Block.Number;
         OwnerSchedule = ownerSchedule;
         MiningSchedule = miningSchedule;
-        MiningGovernance = Create<OpdexMiningGovernance>(0ul, new object[] {Address}).NewContractAddress;
+        PeriodDuration = periodDuration;
+        
+        var miningDuration = periodDuration / 12;
+        MiningGovernance = Create<OpdexMiningGovernance>(0, new object[] {Address, miningDuration}).NewContractAddress;
     }
     
     /// <inheritdoc />
-    public string Symbol => TokenSymbol;
+    public string Symbol
+    {
+        get => State.GetString(nameof(Symbol));
+        private set => State.SetString(nameof(Symbol), value);
+    }
 
     /// <inheritdoc />
-    public string Name => TokenName;
+    public string Name
+    {
+        get => State.GetString(nameof(Name));
+        private set => State.SetString(nameof(Name), value);
+    }
 
     /// <inheritdoc />
-    public byte Decimals => TokenDecimals;
+    public byte Decimals
+    {
+        get => State.GetBytes(nameof(Decimals))[0];
+        private set => State.SetBytes(nameof(Decimals), new [] {value});
+    }
     
     /// <inheritdoc />
     public UInt256 TotalSupply
@@ -83,10 +99,17 @@ public class OpdexToken : SmartContract, IOpdexToken
     }
     
     /// <inheritdoc />
-    public uint YearIndex
+    public uint PeriodIndex
     {
-        get => State.GetUInt32(nameof(YearIndex));
-        private set => State.SetUInt32(nameof(YearIndex), value);
+        get => State.GetUInt32(nameof(PeriodIndex));
+        private set => State.SetUInt32(nameof(PeriodIndex), value);
+    }
+    
+    /// <inheritdoc />
+    public ulong PeriodDuration
+    {
+        get => State.GetUInt64(nameof(PeriodDuration));
+        private set => State.SetUInt64(nameof(PeriodDuration), value);
     }
 
     /// <inheritdoc />
@@ -126,19 +149,19 @@ public class OpdexToken : SmartContract, IOpdexToken
     /// <inheritdoc />
     public void Distribute(byte[] data)
     {
-        var yearIndex = YearIndex;
-        if (yearIndex == 0) Assert(Message.Sender == Owner);
+        var periodIndex = PeriodIndex;
+        if (periodIndex == 0) Assert(Message.Sender == Owner);
         
         var miningGov = MiningGovernance;
         var owner = Owner;
         var ownerSchedule = OwnerSchedule;
         var miningSchedule = MiningSchedule;
         var inflationIndex = (uint)ownerSchedule.Length - 1;
-        var minBlock = yearIndex == 0 ? Genesis : BlocksPerYear * yearIndex + Genesis;
+        var minBlock = periodIndex == 0 ? Genesis : PeriodDuration * periodIndex + Genesis;
         
         Assert(Block.Number >= minBlock, "OPDEX: DISTRIBUTION_NOT_READY");
 
-        var scheduleIndex = yearIndex < inflationIndex ? yearIndex : inflationIndex;
+        var scheduleIndex = periodIndex < inflationIndex ? periodIndex : inflationIndex;
         var ownerTokens = ownerSchedule[scheduleIndex];
         var miningTokens = miningSchedule[scheduleIndex];
         var supplyIncrease = miningTokens + ownerTokens;
@@ -146,13 +169,13 @@ public class OpdexToken : SmartContract, IOpdexToken
         SetBalance(owner, GetBalance(owner) + ownerTokens);
         SetBalance(miningGov, GetBalance(miningGov) + miningTokens);
 
-        data = yearIndex == 0 ? data : new byte[0];
+        data = periodIndex == 0 ? data : new byte[0];
         var notificationResponse = Call(miningGov, 0ul, nameof(IOpdexMiningGovernance.NotifyDistribution), new object[] {data});
         
         Assert(notificationResponse.Success, "OPDEX: FAILED_DISTRIBUTION_NOTIFICATION");
 
         TotalSupply += supplyIncrease;
-        YearIndex++;
+        PeriodIndex++;
         
         Log(new DistributionLog
         {
@@ -160,7 +183,7 @@ public class OpdexToken : SmartContract, IOpdexToken
             MiningAddress = miningGov,
             OwnerAmount = ownerTokens,
             MiningAmount = miningTokens,
-            YearIndex = yearIndex
+            PeriodIndex = periodIndex
         });
     }
 
