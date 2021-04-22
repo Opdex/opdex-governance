@@ -1,13 +1,13 @@
 using System;
 using FluentAssertions;
 using Moq;
-using OpdexTokenTests.Base;
+using OpdexGovernanceTests.Base;
 using Stratis.SmartContracts;
 using Stratis.SmartContracts.CLR;
 using Stratis.SmartContracts.Core;
 using Xunit;
 
-namespace OpdexTokenTests
+namespace OpdexGovernanceTests
 {
     public class OpdexTokenTests : TestBase
     {
@@ -165,8 +165,8 @@ namespace OpdexTokenTests
             PersistentState.SetAddress(nameof(MiningGovernance), MiningGovernance);
             PersistentState.SetUInt256($"Balance:{Owner}", currentOwnerBalance);
             PersistentState.SetUInt256($"Balance:{MiningGovernance}", currentMiningBalance);
-            PersistentState.SetUInt32(nameof(IOpdexToken.PeriodIndex), periodIndex);
-            PersistentState.SetUInt256(nameof(IOpdexToken.TotalSupply), currentTotalSupply);
+            PersistentState.SetUInt32(nameof(IOpdexMinedToken.PeriodIndex), periodIndex);
+            PersistentState.SetUInt256(nameof(IOpdexMinedToken.TotalSupply), currentTotalSupply);
 
             var block = (BlocksPerYear * periodIndex) + genesis;
             SetupBlock(block);
@@ -212,7 +212,7 @@ namespace OpdexTokenTests
             var token = CreateNewOpdexToken(Serializer.Serialize(DefaultOwnerSchedule), Serializer.Serialize(DefaultMiningSchedule), genesis);
             
             PersistentState.SetAddress(nameof(MiningGovernance), MiningGovernance);
-            PersistentState.SetUInt32(nameof(IOpdexToken.PeriodIndex), periodIndex);
+            PersistentState.SetUInt32(nameof(IOpdexMinedToken.PeriodIndex), periodIndex);
             
             SetupBlock(genesis);
 

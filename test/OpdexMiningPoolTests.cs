@@ -1,12 +1,12 @@
 using FluentAssertions;
 using Moq;
-using OpdexTokenTests.Base;
+using OpdexGovernanceTests.Base;
 using Stratis.SmartContracts;
 using Stratis.SmartContracts.CLR;
 using Stratis.SmartContracts.Standards;
 using Xunit;
 
-namespace OpdexTokenTests
+namespace OpdexGovernanceTests
 {
     public class OpdexMiningPoolTests : TestBase
     {
@@ -131,7 +131,7 @@ namespace OpdexTokenTests
             miningPool.GetRewardPerTokenPaid(Miner1).Should().Be(userRewardPerTokenPaid);
 
             VerifyCall(Pool1, 0ul, "TransferFrom", transferParams, Times.Once);
-            VerifyLog(new EnterMiningPoolLog { Miner = Miner1, Amount = amount }, Times.Once);
+            VerifyLog(new StartMiningLog { Miner = Miner1, Amount = amount }, Times.Once);
         }
 
         [Theory]
@@ -163,7 +163,7 @@ namespace OpdexTokenTests
             miningPool.GetRewardPerTokenPaid(Miner1).Should().Be(userRewardPerTokenPaid);
 
             VerifyCall(Pool1, 0ul, "TransferFrom", transferParams, Times.Once);
-            VerifyLog(new EnterMiningPoolLog { Miner = Miner1, Amount = amount }, Times.Once);
+            VerifyLog(new StartMiningLog { Miner = Miner1, Amount = amount }, Times.Once);
         }
 
         [Fact]
@@ -281,7 +281,7 @@ namespace OpdexTokenTests
             miningPool.GetBalance(Miner1).Should().Be(UInt256.Zero);
             
             VerifyCall(Pool1, 0, nameof(IStandardToken256.TransferTo), transferStakingTokensParams, Times.Once);
-            VerifyLog(new ExitMiningPoolLog { Miner = Miner1, Amount = amount }, Times.Once);
+            VerifyLog(new StopMiningLog { Miner = Miner1, Amount = amount }, Times.Once);
 
             if (expectedReward > 0)
             {

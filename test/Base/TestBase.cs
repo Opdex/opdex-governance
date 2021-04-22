@@ -6,7 +6,7 @@ using Stratis.SmartContracts;
 using Stratis.SmartContracts.CLR;
 using Stratis.SmartContracts.CLR.Serialization;
 
-namespace OpdexTokenTests.Base
+namespace OpdexGovernanceTests.Base
 {
     public class TestBase
     {
@@ -73,7 +73,7 @@ namespace OpdexTokenTests.Base
             return new OpdexMiningGovernance(_mockContractState.Object, OPDX, BlocksPerMonth);
         }
         
-        protected IOpdexToken CreateNewOpdexToken(byte[]ownerSchedule, byte[] miningSchedule, ulong block = 10)
+        protected IOpdexMinedToken CreateNewOpdexToken(byte[]ownerSchedule, byte[] miningSchedule, ulong block = 10)
         {
             _mockContractState.Setup(x => x.Message).Returns(new Message(OPDX, Owner, 0));
             
@@ -81,7 +81,7 @@ namespace OpdexTokenTests.Base
             SetupBlock(block);
             SetupCreate<OpdexMiningGovernance>(CreateResult.Succeeded(MiningGovernance), 0ul, new object[] {OPDX, BlocksPerMonth});
             
-            return new OpdexToken(_mockContractState.Object, ownerSchedule, miningSchedule, BlocksPerYear);
+            return new OpdexMinedToken(_mockContractState.Object, ownerSchedule, miningSchedule, BlocksPerYear);
         }
 
         protected IOpdexMiningPool CreateNewMiningPool(ulong block = 10)

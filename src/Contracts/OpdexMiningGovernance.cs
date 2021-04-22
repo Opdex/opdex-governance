@@ -8,20 +8,20 @@ using Stratis.SmartContracts.Standards;
 /// </summary>
 public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
 {
-    private const uint MaximumNominations = 4;
-    private const uint MiningPoolsPerYear = 48;
+    private const uint MaxNominations = 4;
+    private const uint MaxMiningPoolsFunded = 48;
         
     /// <summary>
     /// Constructor initializing opdex token mining governance contract.
     /// </summary>
     /// <param name="state">Smart contract state.</param>
     /// <param name="minedToken">The address of the token being mined.</param>
-    /// <param name="periodDuration">The nomination and mining period block duration.</param>
-    public OpdexMiningGovernance(ISmartContractState state, Address minedToken, ulong periodDuration) : base(state)
+    /// <param name="miningDuration">The nomination and mining period block duration.</param>
+    public OpdexMiningGovernance(ISmartContractState state, Address minedToken, ulong miningDuration) : base(state)
     {
         MinedToken = minedToken;
-        PeriodDuration = periodDuration;
-        NominationPeriodEnd = periodDuration / 4 + Block.Number;
+        MiningDuration = miningDuration;
+        NominationPeriodEnd = miningDuration / 4 + Block.Number;
         Nominations = new Nomination[0];
     }
 
@@ -47,10 +47,10 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
     }
     
     /// <inheritdoc />
-    public ulong PeriodDuration
+    public ulong MiningDuration
     {
-        get => State.GetUInt64(nameof(PeriodDuration));
-        private set => State.SetUInt64(nameof(PeriodDuration), value);
+        get => State.GetUInt64(nameof(MiningDuration));
+        private set => State.SetUInt64(nameof(MiningDuration), value);
     }
 
     /// <inheritdoc />
@@ -104,9 +104,9 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
         {
             var stakingPools = Serializer.ToArray<Address>(data);
         
-            Assert(stakingPools.Length == MaximumNominations);
+            Assert(stakingPools.Length == MaxNominations);
         
-            var nominations = new Nomination[MaximumNominations];
+            var nominations = new Nomination[MaxNominations];
         
             for (var i = 0; i < stakingPools.Length; i++)
             {
@@ -139,7 +139,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
         {
             nominations[existingIndex].Weight = weight;
         }
-        else if (currentLength < MaximumNominations)
+        else if (currentLength < MaxNominations)
         {
             Array.Resize(ref nominations, currentLength + 1);           
             nominations[currentLength] = nomination;
@@ -170,7 +170,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
 
         var nominations = Nominations;
         
-        for (uint i = 0; i < MaximumNominations; i++)
+        for (uint i = 0; i < MaxNominations; i++)
         {
             if (nominations[i].StakingPool == Address.Zero) continue;
             
@@ -191,14 +191,14 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
         
         var nominations = Nominations;
         
-        for (uint i = 0; i < MaximumNominations; i++)
+        for (uint i = 0; i < MaxNominations; i++)
         {
             if (nominations[i].StakingPool == Address.Zero) continue;
             
             RewardMiningPoolExecute(nominations[i], MiningPoolReward);
             IncrementMiningPoolsFunded();
             
-            if (i == MaximumNominations - 1)
+            if (i == MaxNominations - 1)
             {
                 ResetNominations();
             }
@@ -222,19 +222,14 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
 
         Assert(Call(miningPool, 0, nameof(IOpdexMiningPool.NotifyRewardAmount), new object[] { reward }).Success);
         
-        Log(new RewardMiningPoolLog
-        {
-            StakingPool = nomination.StakingPool,
-            MiningPool = miningPool,
-            Amount = reward
-        });
+        Log(new RewardMiningPoolLog { StakingPool = nomination.StakingPool, MiningPool = miningPool, Amount = reward });
     }
 
     private void IncrementMiningPoolsFunded()
     {
         var miningPoolsFunded = MiningPoolsFunded;
         
-        if (++miningPoolsFunded == MiningPoolsPerYear) SetMiningPoolRewardAmountExecute();
+        if (++miningPoolsFunded == MaxMiningPoolsFunded) SetMiningPoolRewardAmountExecute();
         else MiningPoolsFunded = miningPoolsFunded;
     }
 
@@ -244,9 +239,9 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
 
         var balance = (UInt256)Call(MinedToken, 0ul, nameof(IStandardToken.GetBalance), new object[] {Address}).ReturnValue;
         
-        Assert(balance > MiningPoolsPerYear, "OPDEX: INVALID_BALANCE");
+        Assert(balance > MaxMiningPoolsFunded, "OPDEX: INVALID_BALANCE");
 
-        MiningPoolReward = balance / MiningPoolsPerYear;
+        MiningPoolReward = balance / MaxMiningPoolsFunded;
         MiningPoolsFunded = 0;
         Notified = false;
     }
@@ -257,7 +252,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
 
         if (miningPool != Address.Zero) return miningPool;
 
-        miningPool = Create<OpdexMiningPool>(0ul, new object[] { Address, MinedToken, stakingPool, PeriodDuration }).NewContractAddress;
+        miningPool = Create<OpdexMiningPool>(0ul, new object[] { Address, MinedToken, stakingPool, MiningDuration }).NewContractAddress;
         
         SetMiningPool(stakingPool, miningPool);
         
@@ -269,7 +264,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
     private void ResetNominations()
     {
         Nominations = new Nomination[0];
-        NominationPeriodEnd = Block.Number + PeriodDuration;
+        NominationPeriodEnd = Block.Number + MiningDuration;
     }
     
     private static uint LowestNominationWeightIndex(Nomination[] nominations)
@@ -290,7 +285,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
 
     private static int StakingPoolNominationIndex(Nomination[] nominations, Address stakingPool)
     {
-        var max = nominations.Length < MaximumNominations ? (uint)nominations.Length : MaximumNominations;
+        var max = nominations.Length < MaxNominations ? (uint)nominations.Length : MaxNominations;
         
         for (var i = 0; i < max; i++)
         {

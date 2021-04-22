@@ -5,7 +5,7 @@
 /// based on a specified duration between distributions.
 /// </summary>
 [Deploy]
-public class OpdexToken : SmartContract, IOpdexToken
+public class OpdexMinedToken : SmartContract, IOpdexMinedToken
 {
     /// <summary>
     /// Constructor initializing opdex token contract.
@@ -14,7 +14,7 @@ public class OpdexToken : SmartContract, IOpdexToken
     /// <param name="ownerDistribution">Serialized UInt256 array of owner distribution amounts.</param>
     /// <param name="miningDistribution">Serialized UInt256 array of mining distribution amounts.</param>
     /// <param name="periodDuration">The period between token distributions</param>
-    public OpdexToken(ISmartContractState state, byte[] ownerDistribution, byte[] miningDistribution, ulong periodDuration) 
+    public OpdexMinedToken(ISmartContractState state, byte[] ownerDistribution, byte[] miningDistribution, ulong periodDuration) 
         : base(state)
     {
         var ownerSchedule = Serializer.ToArray<UInt256>(ownerDistribution);

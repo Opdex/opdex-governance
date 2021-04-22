@@ -182,7 +182,7 @@ public class OpdexMiningPool : SmartContract, IOpdexMiningPool
 
         SafeTransferFrom(StakingToken, Message.Sender, Address, amount);
 
-        Log(new EnterMiningPoolLog { Miner = Message.Sender, Amount = amount });
+        Log(new StartMiningLog { Miner = Message.Sender, Amount = amount });
         
         Unlock();
     }
@@ -214,7 +214,7 @@ public class OpdexMiningPool : SmartContract, IOpdexMiningPool
         
         SafeTransferTo(StakingToken, Message.Sender, amount);
         
-        Log(new ExitMiningPoolLog { Miner = Message.Sender, Amount = amount });
+        Log(new StopMiningLog { Miner = Message.Sender, Amount = amount });
         
         CollectExecute();
         
@@ -261,14 +261,13 @@ public class OpdexMiningPool : SmartContract, IOpdexMiningPool
     {
         var reward = GetReward(Message.Sender);
 
-        if (reward > 0)
-        {
-            SetReward(Message.Sender, 0);
+        if (reward == 0) return;
+
+        SetReward(Message.Sender, 0);
             
-            SafeTransferTo(MinedToken, Message.Sender, reward);
+        SafeTransferTo(MinedToken, Message.Sender, reward);
             
-            Log(new CollectMiningRewardsLog { Miner = Message.Sender, Amount = reward });
-        }
+        Log(new CollectMiningRewardsLog { Miner = Message.Sender, Amount = reward });
     }
 
     private void UpdateReward(Address address)
@@ -280,8 +279,7 @@ public class OpdexMiningPool : SmartContract, IOpdexMiningPool
 
         if (address == Address.Zero) return;
         
-        var earned = Earned(address);
-        SetReward(address, earned);
+        SetReward(address, Earned(address));
             
         SetRewardPerTokenPaid(address, rewardPerToken);
     }

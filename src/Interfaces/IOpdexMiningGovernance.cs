@@ -41,7 +41,7 @@ public interface IOpdexMiningGovernance
     /// <summary>
     /// The number of blocks of each nomination/mining period.
     /// </summary>
-    ulong PeriodDuration { get; }
+    ulong MiningDuration { get; }
 
     /// <summary>
     /// Retrieve the mining pool address by the liquidity pool token address. 

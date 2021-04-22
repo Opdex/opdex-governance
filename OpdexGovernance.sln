@@ -1,8 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpdexToken", "src\OpdexToken.csproj", "{511A5534-D875-4892-9A83-8137BA6EBF3E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpdexGovernance", "src\OpdexGovernance.csproj", "{511A5534-D875-4892-9A83-8137BA6EBF3E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpdexTokenTests", "test\OpdexTokenTests.csproj", "{E4DE208A-D05C-434F-8045-B717ADE1089B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpdexGovernanceTests", "test\OpdexGovernanceTests.csproj", "{E4DE208A-D05C-434F-8045-B717ADE1089B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

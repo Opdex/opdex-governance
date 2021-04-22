@@ -1,7 +1,7 @@
 using Stratis.SmartContracts;
 using Stratis.SmartContracts.Standards;
 
-public interface IOpdexToken : IStandardToken256
+public interface IOpdexMinedToken : IStandardToken256
 {
     /// <summary>
     /// The address of the owner.
