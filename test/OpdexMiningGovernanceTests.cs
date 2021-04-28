@@ -7,11 +7,19 @@ using Stratis.SmartContracts;
 using Stratis.SmartContracts.CLR;
 using Stratis.SmartContracts.Core;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace OpdexGovernanceTests
 {
     public class OpdexMiningGovernanceTests : TestBase
     {
+        private readonly ITestOutputHelper _testOutputHelper;
+
+        public OpdexMiningGovernanceTests(ITestOutputHelper testOutputHelper)
+        {
+            _testOutputHelper = testOutputHelper;
+        }
+
         [Fact]
         public void CreateMiningGovernanceContract_Success()
         {
@@ -820,27 +828,25 @@ namespace OpdexGovernanceTests
         #endregion
 
         [Fact]
-        public void emptyByteArray()
+        public void SerializeAddresses_Success()
         {
-            var btc = Serializer.ToAddress("P95Rx5Ts6Q5zsTYJYL49zJy75Le7x3neV2");
-            var eth = Serializer.ToAddress("PDArZge8uxydeNGcN21Fc8fQ9AmsVKQLeR");
-            var avax = Serializer.ToAddress("PFN3DovPUpgSJZivtQ8BDDsAHcZniUmshx");
-            var glu = Serializer.ToAddress("PVEYZzRJs9bEYw2VQG2o7AfCsUtX6cYGBv");
+            var token1 = Serializer.ToAddress("P95Rx5Ts6Q5zsTYJYL49zJy75Le7x3neV2");
+            var token2 = Serializer.ToAddress("PDArZge8uxydeNGcN21Fc8fQ9AmsVKQLeR");
+            var token3 = Serializer.ToAddress("PFN3DovPUpgSJZivtQ8BDDsAHcZniUmshx");
+            var token4 = Serializer.ToAddress("PVEYZzRJs9bEYw2VQG2o7AfCsUtX6cYGBv");
         
-            Console.WriteLine(btc);
+            _testOutputHelper.WriteLine(token1.ToString());
             
-            var hexString = Serializer.Serialize(new [] {btc, eth, avax, glu}).ToHexString();
+            var hexString = Serializer.Serialize(new[] {token1, token2, token3, token4}).ToHexString();
             
-            Console.WriteLine(hexString);
+            _testOutputHelper.WriteLine(hexString);
         
             var addresses = Serializer.ToArray<Address>(hexString.HexToByteArray());
-        
+
             foreach (var address in addresses)
             {
-                Console.WriteLine(address);
+                _testOutputHelper.WriteLine(address.ToString());
             }
-            
-            Console.WriteLine(Serializer.ToString("5472616E736665724C6F67".HexToByteArray()));
         }
     }
 }
