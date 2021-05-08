@@ -13,26 +13,26 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
     /// <param name="state">Smart contract state.</param>
     /// <param name="ownerDistribution">Serialized UInt256 array of owner distribution amounts.</param>
     /// <param name="miningDistribution">Serialized UInt256 array of mining distribution amounts.</param>
-    /// <param name="periodDuration">The period between token distributions</param>
-    public OpdexMinedToken(ISmartContractState state, byte[] ownerDistribution, byte[] miningDistribution, ulong periodDuration) 
-        : base(state)
+    /// <param name="periodDuration">The number of blocks between token distributions.</param>
+    public OpdexMinedToken(ISmartContractState state, byte[] ownerDistribution, byte[] miningDistribution, ulong periodDuration) : base(state)
     {
-        var ownerSchedule = Serializer.ToArray<UInt256>(ownerDistribution);
+        var vaultSchedule = Serializer.ToArray<UInt256>(ownerDistribution);
         var miningSchedule = Serializer.ToArray<UInt256>(miningDistribution);
 
-        Assert(ownerSchedule.Length > 1 && ownerSchedule.Length == miningSchedule.Length);
+        Assert(vaultSchedule.Length > 1 && vaultSchedule.Length == miningSchedule.Length);
 
         Name = "Opdex";
-        Symbol = "OPDX";
+        Symbol = "ODX";
         Decimals = 8;
-        Owner = Message.Sender;
+        Creator = Message.Sender;
         Genesis = Block.Number;
-        OwnerSchedule = ownerSchedule;
+        VaultSchedule = vaultSchedule;
         MiningSchedule = miningSchedule;
         PeriodDuration = periodDuration;
         
         var miningDuration = periodDuration / 12;
         MiningGovernance = Create<OpdexMiningGovernance>(0, new object[] {Address, miningDuration}).NewContractAddress;
+        Vault = Create<OpdexVault>(0, new object[] {Address, Message.Sender}).NewContractAddress;
     }
     
     /// <inheritdoc />
@@ -64,10 +64,10 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
     }
 
     /// <inheritdoc />
-    public Address Owner
+    public Address Creator
     {
-        get => State.GetAddress(nameof(Owner));
-        private set => State.SetAddress(nameof(Owner), value);
+        get => State.GetAddress(nameof(Creator));
+        private set => State.SetAddress(nameof(Creator), value);
     }
     
     /// <inheritdoc />
@@ -78,10 +78,17 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
     }
     
     /// <inheritdoc />
-    public UInt256[] OwnerSchedule
+    public Address Vault
     {
-        get => State.GetArray<UInt256>(nameof(OwnerSchedule));
-        private set => State.SetArray(nameof(OwnerSchedule), value);
+        get => State.GetAddress(nameof(Vault));
+        private set => State.SetAddress(nameof(Vault), value);
+    }
+    
+    /// <inheritdoc />
+    public UInt256[] VaultSchedule
+    {
+        get => State.GetArray<UInt256>(nameof(VaultSchedule));
+        private set => State.SetArray(nameof(VaultSchedule), value);
     }
 
     /// <inheritdoc />
@@ -150,51 +157,41 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
     public void Distribute(byte[] data)
     {
         var periodIndex = PeriodIndex;
-        if (periodIndex == 0) Assert(Message.Sender == Owner);
+        if (periodIndex == 0) Assert(Message.Sender == Creator);
         
         var miningGov = MiningGovernance;
-        var owner = Owner;
-        var ownerSchedule = OwnerSchedule;
+        var owner = Creator;
+        var vault = Vault;
+        var vaultSchedule = VaultSchedule;
         var miningSchedule = MiningSchedule;
-        var inflationIndex = (uint)ownerSchedule.Length - 1;
+        var inflationIndex = (uint)vaultSchedule.Length - 1;
         var minBlock = periodIndex == 0 ? Genesis : PeriodDuration * periodIndex + Genesis;
         
         Assert(Block.Number >= minBlock, "OPDEX: DISTRIBUTION_NOT_READY");
 
         var scheduleIndex = periodIndex < inflationIndex ? periodIndex : inflationIndex;
-        var ownerTokens = ownerSchedule[scheduleIndex];
+        var vaultTokens = vaultSchedule[scheduleIndex];
         var miningTokens = miningSchedule[scheduleIndex];
-        var supplyIncrease = miningTokens + ownerTokens;
+        var supplyIncrease = miningTokens + vaultTokens;
         
-        SetBalance(owner, GetBalance(owner) + ownerTokens);
+        SetBalance(vault, GetBalance(vault) + vaultTokens);
         SetBalance(miningGov, GetBalance(miningGov) + miningTokens);
 
         data = periodIndex == 0 ? data : new byte[0];
-        var notificationResponse = Call(miningGov, 0ul, nameof(IOpdexMiningGovernance.NotifyDistribution), new object[] {data});
+        var governanceNotification = Call(miningGov, 0ul, nameof(IOpdexMiningGovernance.NotifyDistribution), new object[] {data});
+        var vaultNotification = Call(vault, 0, nameof(IOpdexVault.NotifyDistribution), new object[] { vaultTokens });
         
-        Assert(notificationResponse.Success, "OPDEX: FAILED_DISTRIBUTION_NOTIFICATION");
+        Assert(governanceNotification.Success && vaultNotification.Success, "OPDEX: FAILED_DISTRIBUTION_NOTIFICATION");
 
         TotalSupply += supplyIncrease;
         PeriodIndex++;
         
         Log(new DistributionLog
         {
-            OwnerAddress = owner,
-            MiningAddress = miningGov,
-            OwnerAmount = ownerTokens,
+            VaultAmount = vaultTokens,
             MiningAmount = miningTokens,
             PeriodIndex = periodIndex
         });
-    }
-
-    /// <inheritdoc />
-    public void SetOwner(Address owner)
-    {
-        Assert(Message.Sender == Owner, "OPDEX: UNAUTHORIZED");
-        
-        Owner = owner;
-        
-        Log(new OwnerChangeLog { From = Message.Sender, To = owner });
     }
     
     /// <inheritdoc />

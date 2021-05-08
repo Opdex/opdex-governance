@@ -16,7 +16,7 @@ namespace OpdexGovernanceTests
             var miningPool = CreateNewMiningPool();
 
             miningPool.MiningGovernance.Should().Be(MiningGovernance);
-            miningPool.MinedToken.Should().Be(OPDX);
+            miningPool.MinedToken.Should().Be(ODX);
             miningPool.StakingToken.Should().Be(Pool1);
             miningPool.MiningDuration.Should().Be(BlocksPerMonth);
             miningPool.TotalSupply.Should().Be(UInt256.Zero);
@@ -212,7 +212,7 @@ namespace OpdexGovernanceTests
             PersistentState.SetUInt64(nameof(IOpdexMiningPool.MiningPeriodEndBlock), periodFinish);
 
             var transferParams = new object[] { Miner1, expectedReward };
-            SetupCall(OPDX, 0ul, nameof(IStandardToken256.TransferTo), transferParams, TransferResult.Transferred(true));
+            SetupCall(ODX, 0ul, nameof(IStandardToken256.TransferTo), transferParams, TransferResult.Transferred(true));
             
             var miningPool = CreateNewMiningPool(periodStart);
 
@@ -225,12 +225,12 @@ namespace OpdexGovernanceTests
             
             if (expectedReward > 0)
             {
-                VerifyCall(OPDX, 0, nameof(IStandardToken256.TransferTo), transferParams, Times.Once);
+                VerifyCall(ODX, 0, nameof(IStandardToken256.TransferTo), transferParams, Times.Once);
                 VerifyLog(new CollectMiningRewardsLog { Miner = Miner1, Amount = expectedReward }, Times.Once);
             }
             else
             {
-                VerifyCall(OPDX, 0, nameof(IStandardToken256.TransferTo), transferParams, Times.Never);
+                VerifyCall(ODX, 0, nameof(IStandardToken256.TransferTo), transferParams, Times.Never);
                 VerifyLog(new CollectMiningRewardsLog { Miner = It.IsAny<Address>(), Amount = It.IsAny<UInt256>() }, Times.Never);
             }
         }
@@ -254,19 +254,19 @@ namespace OpdexGovernanceTests
         [InlineData(100, 200, 125, 125, 10_000_000_000, 100_000_000, 100_000_000, 0)]
         [InlineData(100, 200, 126, 125, 10_000_000_000, 100_000_000, 100_000_000, 1_000_000)]
         public void Exit_Success(ulong periodStart, ulong periodFinish, ulong currentBlock, ulong lastUpdateBlock,
-            UInt256 totalSupply, UInt256 rewardRate, UInt256 amount, UInt256 expectedReward)
+            UInt256 totalSupply, UInt256 rewardRate, UInt256 minerBalance, UInt256 expectedReward)
         {
             PersistentState.SetUInt256(nameof(IOpdexMiningPool.RewardPerToken), UInt256.Zero);
             PersistentState.SetUInt256(nameof(IOpdexMiningPool.TotalSupply), totalSupply);
             PersistentState.SetUInt256(nameof(IOpdexMiningPool.RewardRate), rewardRate);
-            PersistentState.SetUInt256($"Balance:{Miner1}", amount);
+            PersistentState.SetUInt256($"Balance:{Miner1}", minerBalance);
             PersistentState.SetUInt64(nameof(IOpdexMiningPool.LastUpdateBlock), lastUpdateBlock);
             PersistentState.SetUInt64(nameof(IOpdexMiningPool.MiningPeriodEndBlock), periodFinish);
 
             var transferRewardParams = new object[] { Miner1, expectedReward };
-            SetupCall(OPDX, 0ul, nameof(IStandardToken256.TransferTo), transferRewardParams, TransferResult.Transferred(true));
+            SetupCall(ODX, 0ul, nameof(IStandardToken256.TransferTo), transferRewardParams, TransferResult.Transferred(true));
             
-            var transferStakingTokensParams = new object[] { Miner1, expectedReward };
+            var transferStakingTokensParams = new object[] { Miner1, minerBalance };
             SetupCall(Pool1, 0ul, nameof(IStandardToken256.TransferTo), transferStakingTokensParams, TransferResult.Transferred(true));
             
             var miningPool = CreateNewMiningPool(periodStart);
@@ -277,20 +277,20 @@ namespace OpdexGovernanceTests
             miningPool.Exit();
 
             miningPool.GetReward(Miner1).Should().Be(UInt256.Zero);
-            miningPool.TotalSupply.Should().Be(totalSupply - amount);
+            miningPool.TotalSupply.Should().Be(totalSupply - minerBalance);
             miningPool.GetBalance(Miner1).Should().Be(UInt256.Zero);
             
             VerifyCall(Pool1, 0, nameof(IStandardToken256.TransferTo), transferStakingTokensParams, Times.Once);
-            VerifyLog(new StopMiningLog { Miner = Miner1, Amount = amount }, Times.Once);
+            VerifyLog(new StopMiningLog { Miner = Miner1, Amount = minerBalance }, Times.Once);
 
             if (expectedReward > 0)
             {
-                VerifyCall(OPDX, 0, nameof(IStandardToken256.TransferTo), transferRewardParams, Times.Once);
+                VerifyCall(ODX, 0, nameof(IStandardToken256.TransferTo), transferRewardParams, Times.Once);
                 VerifyLog(new CollectMiningRewardsLog { Miner = Miner1, Amount = expectedReward }, Times.Once);
             }
             else
             {
-                VerifyCall(OPDX, 0, nameof(IStandardToken256.TransferTo), transferRewardParams, Times.Never);
+                VerifyCall(ODX, 0, nameof(IStandardToken256.TransferTo), transferRewardParams, Times.Never);
                 VerifyLog(new CollectMiningRewardsLog { Miner = It.IsAny<Address>(), Amount = It.IsAny<UInt256>() }, Times.Never);
             }
         }
@@ -321,11 +321,11 @@ namespace OpdexGovernanceTests
             SetupMessage(MiningPool1, MiningGovernance);
             
             PersistentState.SetUInt64(nameof(IOpdexMiningPool.MiningDuration), duration);
-            PersistentState.SetAddress(nameof(IOpdexMiningPool.MinedToken), OPDX);
+            PersistentState.SetAddress(nameof(IOpdexMiningPool.MinedToken), ODX);
             PersistentState.SetAddress(nameof(IOpdexMiningPool.MiningGovernance), MiningGovernance);
 
             var balanceParams = new object[] {MiningPool1};
-            SetupCall(OPDX, 0ul, nameof(IStandardToken.GetBalance), balanceParams, TransferResult.Transferred(rewardAmount));
+            SetupCall(ODX, 0ul, nameof(IStandardToken.GetBalance), balanceParams, TransferResult.Transferred(rewardAmount));
             
             miningPool.NotifyRewardAmount(rewardAmount);
 
@@ -352,13 +352,13 @@ namespace OpdexGovernanceTests
             SetupMessage(MiningPool1, MiningGovernance);
             
             PersistentState.SetUInt64(nameof(IOpdexMiningPool.MiningDuration), duration);
-            PersistentState.SetAddress(nameof(IOpdexMiningPool.MinedToken), OPDX);
+            PersistentState.SetAddress(nameof(IOpdexMiningPool.MinedToken), ODX);
             PersistentState.SetAddress(nameof(IOpdexMiningPool.MiningGovernance), MiningGovernance);
             PersistentState.SetUInt64(nameof(IOpdexMiningPool.MiningPeriodEndBlock), endBlock);
             PersistentState.SetUInt256(nameof(IOpdexMiningPool.RewardRate), rewardRate);
 
             var balanceParams = new object[] {MiningPool1};
-            SetupCall(OPDX, 0ul, nameof(IStandardToken.GetBalance), balanceParams, TransferResult.Transferred(balance));
+            SetupCall(ODX, 0ul, nameof(IStandardToken.GetBalance), balanceParams, TransferResult.Transferred(balance));
             
             miningPool.NotifyRewardAmount(rewardAmount);
 
@@ -414,11 +414,11 @@ namespace OpdexGovernanceTests
             SetupMessage(MiningPool1, MiningGovernance);
             
             PersistentState.SetUInt64(nameof(IOpdexMiningPool.MiningDuration), duration);
-            PersistentState.SetAddress(nameof(IOpdexMiningPool.MinedToken), OPDX);
+            PersistentState.SetAddress(nameof(IOpdexMiningPool.MinedToken), ODX);
             PersistentState.SetAddress(nameof(IOpdexMiningPool.MiningGovernance), MiningGovernance);
 
             var balanceParams = new object[] {MiningPool1};
-            SetupCall(OPDX, 0ul, nameof(IStandardToken.GetBalance), balanceParams, TransferResult.Transferred(UInt256.Zero));
+            SetupCall(ODX, 0ul, nameof(IStandardToken.GetBalance), balanceParams, TransferResult.Transferred(UInt256.Zero));
             
             miningPool
                 .Invoking(m => m.NotifyRewardAmount(100_000))
@@ -439,11 +439,11 @@ namespace OpdexGovernanceTests
             SetupMessage(MiningPool1, MiningGovernance);
             
             PersistentState.SetUInt64(nameof(IOpdexMiningPool.MiningDuration), duration);
-            PersistentState.SetAddress(nameof(IOpdexMiningPool.MinedToken), OPDX);
+            PersistentState.SetAddress(nameof(IOpdexMiningPool.MinedToken), ODX);
             PersistentState.SetAddress(nameof(IOpdexMiningPool.MiningGovernance), MiningGovernance);
 
             var balanceParams = new object[] {MiningPool1};
-            SetupCall(OPDX, 0ul, nameof(IStandardToken.GetBalance), balanceParams, TransferResult.Transferred(balance));
+            SetupCall(ODX, 0ul, nameof(IStandardToken.GetBalance), balanceParams, TransferResult.Transferred(balance));
             
             miningPool
                 .Invoking(m => m.NotifyRewardAmount(UInt256.MaxValue))

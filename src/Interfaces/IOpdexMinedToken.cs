@@ -4,9 +4,9 @@ using Stratis.SmartContracts.Standards;
 public interface IOpdexMinedToken : IStandardToken256
 {
     /// <summary>
-    /// The address of the owner.
+    /// The address of the contract creator.
     /// </summary>
-    Address Owner { get; }
+    Address Creator { get; }
     
     /// <summary>
     /// The address of the mining governance contract.
@@ -14,9 +14,14 @@ public interface IOpdexMinedToken : IStandardToken256
     Address MiningGovernance { get; }
     
     /// <summary>
+    /// The address of the vault contract.
+    /// </summary>
+    Address Vault { get; }
+    
+    /// <summary>
     /// The scheduled amounts to mint to the owner.
     /// </summary>
-    UInt256[] OwnerSchedule { get; }
+    UInt256[] VaultSchedule { get; }
     
     /// <summary>
     /// The scheduled amounts to mint for mining.
@@ -58,14 +63,8 @@ public interface IOpdexMinedToken : IStandardToken256
     void Distribute(byte[] data);
 
     /// <summary>
-    /// Updates the current owner of the token to a new owner address. Only the current owner can set a new owner.
-    /// </summary>
-    /// <param name="owner">Address of the new owner to set.</param>
-    void SetOwner(Address owner);
-
-    /// <summary>
     /// Nominates a liquidity pool by its staking weight for liquidity mining. The caller must be a smart contract
-    /// and must have an OPDX Token balance.
+    /// and must have an ODX Token balance.
     /// </summary>
     void NominateLiquidityPool();
 }
