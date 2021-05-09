@@ -161,14 +161,21 @@ namespace OpdexGovernanceTests
         [Fact]
         public void RedeemCertificates_MultipleValid_Success()
         {
-            const ulong block = 2500;
-            UInt256 expectedTotalTransfer = 150;
+            const ulong block = 3001;
+            UInt256 expectedTotalTransfer = 175;
 
             var existingCertificates = new[]
             {
-                new VaultCertificate {Amount = 100, VestedBlock = 500},
-                new VaultCertificate {Amount = 50, VestedBlock = 1500},
-                new VaultCertificate {Amount = 25, VestedBlock = 3000}
+                new VaultCertificate {Amount = 100, VestedBlock = 1000},
+                new VaultCertificate {Amount = 50, VestedBlock = 2000},
+                new VaultCertificate {Amount = 25, VestedBlock = 3000},
+                new VaultCertificate {Amount = 25, VestedBlock = 4000},
+                new VaultCertificate {Amount = 25, VestedBlock = 5000},
+                new VaultCertificate {Amount = 25, VestedBlock = 6000},
+                new VaultCertificate {Amount = 25, VestedBlock = 7000},
+                new VaultCertificate {Amount = 25, VestedBlock = 8000},
+                new VaultCertificate {Amount = 25, VestedBlock = 9000},
+                new VaultCertificate {Amount = 25, VestedBlock = 10000}
             };
             
             var vault = CreateNewOpdexVault(block);
@@ -184,8 +191,14 @@ namespace OpdexGovernanceTests
             vault.RedeemCertificates();
 
             var certificates = vault.GetCertificates(Owner);
-            certificates.Length.Should().Be(1);
-            certificates[0].Should().BeEquivalentTo(existingCertificates[2]);
+            certificates.Length.Should().Be(7);
+            certificates[0].Should().BeEquivalentTo(existingCertificates[3]);
+            certificates[1].Should().BeEquivalentTo(existingCertificates[4]);
+            certificates[2].Should().BeEquivalentTo(existingCertificates[5]);
+            certificates[3].Should().BeEquivalentTo(existingCertificates[6]);
+            certificates[4].Should().BeEquivalentTo(existingCertificates[7]);
+            certificates[5].Should().BeEquivalentTo(existingCertificates[8]);
+            certificates[6].Should().BeEquivalentTo(existingCertificates[9]);
 
             VerifyCall(ODX, 0, nameof(IOpdexMinedToken.TransferTo), transferToParams, Times.Once);
             VerifyLog(new VaultCertificateRedeemedLog {Wallet = Owner, Amount = existingCertificates[0].Amount }, Times.Once);
@@ -251,100 +264,7 @@ namespace OpdexGovernanceTests
         }
 
         [Fact]
-        public void RedeemCertificate_NoneValid_Success()
-        {
-            const ulong block = 2500;
-
-            var existingCertificates = new[]
-            {
-                new VaultCertificate {Amount = 25, VestedBlock = 3000},
-                new VaultCertificate {Amount = 25, VestedBlock = 4000},
-            };
-            
-            var vault = CreateNewOpdexVault(block);
-            
-            PersistentState.SetArray($"Certificates:{Owner}", existingCertificates);
-            PersistentState.SetAddress(nameof(IOpdexVault.Token), ODX);
-            
-            SetupMessage(Vault, Owner);
-
-            vault.RedeemCertificate();
-
-            var certificates = vault.GetCertificates(Owner);
-            certificates.Should().BeEquivalentTo(existingCertificates);
-
-            VerifyCall(ODX, 0, nameof(IOpdexMinedToken.TransferTo), It.IsAny<object[]>(), Times.Never);
-            VerifyLog(It.IsAny<VaultCertificateRedeemedLog>(), Times.Never);
-        }
-        
-        [Fact]
-        public void RedeemCertificate_AllValid_Success()
-        {
-            const ulong block = 2500;
-            UInt256 expectedTotalTransfer = 100;
-
-            var existingCertificates = new[]
-            {
-                new VaultCertificate {Amount = 100, VestedBlock = 500},
-                new VaultCertificate {Amount = 50, VestedBlock = 1500}
-            };
-            
-            var vault = CreateNewOpdexVault(block);
-            
-            PersistentState.SetArray($"Certificates:{Owner}", existingCertificates);
-            PersistentState.SetAddress(nameof(IOpdexVault.Token), ODX);
-            
-            SetupMessage(Vault, Owner);
-
-            var transferToParams = new object[] {Owner, expectedTotalTransfer};
-            SetupCall(ODX, 0, nameof(IOpdexMinedToken.TransferTo), transferToParams, TransferResult.Transferred(true));
-            
-            vault.RedeemCertificate();
-
-            var certificates = vault.GetCertificates(Owner);
-            certificates.Length.Should().Be(1);
-            certificates[0].Should().Be(existingCertificates[1]);
-
-            VerifyCall(ODX, 0, nameof(IOpdexMinedToken.TransferTo), transferToParams, Times.Once);
-            VerifyLog(new VaultCertificateRedeemedLog {Wallet = Owner, Amount = existingCertificates[0].Amount }, Times.Once);
-        }
-        
-        [Fact]
-        public void RedeemCertificate_MultipleValid_Success()
-        {
-            const ulong block = 2500;
-            UInt256 expectedTotalTransfer = 100;
-
-            var existingCertificates = new[]
-            {
-                new VaultCertificate {Amount = 25, VestedBlock = 3000},
-                new VaultCertificate {Amount = 100, VestedBlock = 500},
-                new VaultCertificate {Amount = 50, VestedBlock = 1500},
-            };
-            
-            var vault = CreateNewOpdexVault(block);
-            
-            PersistentState.SetArray($"Certificates:{Owner}", existingCertificates);
-            PersistentState.SetAddress(nameof(IOpdexVault.Token), ODX);
-            
-            SetupMessage(Vault, Owner);
-
-            var transferToParams = new object[] {Owner, expectedTotalTransfer};
-            SetupCall(ODX, 0, nameof(IOpdexMinedToken.TransferTo), transferToParams, TransferResult.Transferred(true));
-            
-            vault.RedeemCertificate();
-
-            var certificates = vault.GetCertificates(Owner);
-            certificates.Length.Should().Be(2);
-            certificates[0].Should().Be(existingCertificates[0]);
-            certificates[1].Should().Be(existingCertificates[2]);
-
-            VerifyCall(ODX, 0, nameof(IOpdexMinedToken.TransferTo), transferToParams, Times.Once);
-            VerifyLog(new VaultCertificateRedeemedLog {Wallet = Owner, Amount = existingCertificates[1].Amount }, Times.Once);
-        }
-
-        [Fact]
-        public void CreateCertificate_Success()
+        public void CreateCertificate_NewHolder_Success()
         {
             const ulong block = 2500;
             UInt256 transferAmount = 25;
@@ -367,6 +287,44 @@ namespace OpdexGovernanceTests
             opdexCertificates.Single().Amount.Should().Be(expectedOpdexCertificateBalance);
             minerCertificates.Single().Amount.Should().Be(transferAmount);
             minerCertificates.Single().VestedBlock.Should().Be(block + BlocksPerYear);
+            
+            VerifyLog(new VaultCertificateCreatedLog
+            {
+                Wallet = Miner1, 
+                Amount = transferAmount, 
+                VestedBlock = block + BlocksPerYear
+            }, Times.Once);
+        }
+
+        [Fact]
+        public void CreateCertificate_ExistingHolder_Success()
+        {
+            const ulong block = 2500;
+            UInt256 transferAmount = 25;
+            UInt256 expectedOpdexCertificateBalance = 75;
+            
+            var existingOwnerCertificates = new[] { new VaultCertificate {Amount = 100, VestedBlock = 3000} };
+            var existingMinerCertificates = new[] { new VaultCertificate {Amount = 100, VestedBlock = 3000} };
+            
+            var vault = CreateNewOpdexVault(block);
+            
+            PersistentState.SetArray($"Certificates:{Owner}", existingOwnerCertificates);
+            PersistentState.SetArray($"Certificates:{Miner1}", existingMinerCertificates);
+            PersistentState.SetAddress(nameof(IOpdexVault.Token), ODX);
+            
+            SetupMessage(Vault, Owner);
+            
+            vault.CreateCertificate(Miner1, transferAmount, BlocksPerYear).Should().BeTrue();
+
+            var opdexCertificates = vault.GetCertificates(Owner);
+            var minerCertificates = vault.GetCertificates(Miner1);
+
+            opdexCertificates.Single().Amount.Should().Be(expectedOpdexCertificateBalance);
+            minerCertificates.Length.Should().Be(2);
+            minerCertificates[0].Amount.Should().Be((UInt256)100);
+            minerCertificates[0].VestedBlock.Should().Be(3000);
+            minerCertificates[1].Amount.Should().Be(transferAmount);
+            minerCertificates[1].VestedBlock.Should().Be(block + BlocksPerYear);
             
             VerifyLog(new VaultCertificateCreatedLog
             {
@@ -398,7 +356,7 @@ namespace OpdexGovernanceTests
             var minerCertificates = vault.GetCertificates(Miner1);
 
             opdexCertificates.Single().Amount.Should().Be(expectedOpdexCertificateBalance);
-            minerCertificates.Should().BeNull();
+            minerCertificates.Should().BeEquivalentTo(new VaultCertificate[0]);
             
             VerifyLog(It.IsAny<VaultCertificateCreatedLog>(), Times.Never);
         }

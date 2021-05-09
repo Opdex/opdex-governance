@@ -20,21 +20,20 @@ public interface IOpdexVault
     VaultCertificate[] GetCertificates(Address address);
     
     /// <summary>
-    /// Flag to allow the token to notify the vault of distribution and to assign a new
-    /// certificate to the vault owner.
+    /// Flag to allow the token to notify the vault of distribution and to assign a new certificate to the vault owner.
     /// </summary>
+    /// <remarks>
+    /// The vault owner can be reassigned to a new address. Any address can hold onto a maximum of 10 certificates.
+    /// If the owner has 10 unclaimed certificates, the distributed tokens to the vault contract will be intentionally
+    /// burned by because they will not have a certificate that represents them.
+    /// </remarks>
     /// <param name="amount">The amount of tokens locked.</param>
     void NotifyDistribution(UInt256 amount);
     
     /// <summary>
-    /// Redeems all certificates and transfers the locked tokens to the transaction sender.
+    /// Redeems all vested certificates the sender owns and transfers the claimed tokens.
     /// </summary>
     void RedeemCertificates();
-    
-    /// <summary>
-    /// Redeems one certificate and transfers tokens to the transaction sender.
-    /// </summary>
-    void RedeemCertificate();
 
     /// <summary>
     /// Allows the vault owner to issue new certificates to wallet addresses with a set vesting period.
