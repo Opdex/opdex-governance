@@ -200,7 +200,6 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
         if (amount == 0)
         {
             Log(new TransferLog { From = Message.Sender, To = to, Amount = 0 });
-
             return true;
         }
 
@@ -222,7 +221,6 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
         if (amount == 0)
         {
             Log(new TransferLog { From = from, To = to, Amount = 0 });
-
             return true;
         }
 

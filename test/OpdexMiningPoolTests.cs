@@ -314,6 +314,7 @@ namespace OpdexGovernanceTests
             const ulong duration = 100;
             UInt256 rewardAmount = 100_000;
             UInt256 expectedRewardRate = 1_000;
+            UInt256 rewardRate = 1_000;
             
             var miningPool = CreateNewMiningPool();
             
@@ -331,7 +332,7 @@ namespace OpdexGovernanceTests
 
             miningPool.RewardRate.Should().Be(expectedRewardRate);
 
-            VerifyLog(new MiningPoolRewardedLog { Amount = rewardAmount }, Times.Once);
+            VerifyLog(new MiningPoolRewardedLog { Amount = rewardAmount, RewardRate = rewardRate }, Times.Once);
         }
 
         [Fact]
@@ -366,7 +367,7 @@ namespace OpdexGovernanceTests
             miningPool.LastUpdateBlock.Should().Be(currentBlock);
             miningPool.MiningPeriodEndBlock.Should().Be(currentBlock + duration);
 
-            VerifyLog(new MiningPoolRewardedLog { Amount = rewardAmount }, Times.Once);
+            VerifyLog(new MiningPoolRewardedLog { Amount = rewardAmount, RewardRate = newRewardRate }, Times.Once);
         }
 
         [Fact]

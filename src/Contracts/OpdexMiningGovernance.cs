@@ -228,9 +228,15 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
     private void IncrementMiningPoolsFunded()
     {
         var miningPoolsFunded = MiningPoolsFunded;
-        
-        if (++miningPoolsFunded == MaxMiningPoolsFunded) SetMiningPoolRewardAmountExecute();
-        else MiningPoolsFunded = miningPoolsFunded;
+
+        if (++miningPoolsFunded == MaxMiningPoolsFunded)
+        {
+            SetMiningPoolRewardAmountExecute();
+        }
+        else
+        {
+            MiningPoolsFunded = miningPoolsFunded;
+        }
     }
 
     private void SetMiningPoolRewardAmountExecute()

@@ -252,7 +252,7 @@ public class OpdexMiningPool : SmartContract, IOpdexMiningPool
         LastUpdateBlock = Block.Number;
         MiningPeriodEndBlock = Block.Number + miningDuration;
         
-        Log(new MiningPoolRewardedLog { Amount = reward });
+        Log(new MiningPoolRewardedLog { Amount = reward, RewardRate = RewardRate });
         
         Unlock();
     }

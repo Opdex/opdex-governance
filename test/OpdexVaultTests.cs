@@ -41,7 +41,7 @@ namespace OpdexGovernanceTests
             
             VerifyLog(new VaultCertificateCreatedLog
             {
-                Wallet = Owner, 
+                Owner = Owner, 
                 Amount = distributionAmount, 
                 VestedBlock = block + BlocksPerYear
             }, Times.Once);
@@ -72,7 +72,7 @@ namespace OpdexGovernanceTests
             
             VerifyLog(new VaultCertificateCreatedLog
             {
-                Wallet = Owner, 
+                Owner = Owner, 
                 Amount = distributionAmount, 
                 VestedBlock = block + BlocksPerYear
             }, Times.Once);
@@ -133,7 +133,7 @@ namespace OpdexGovernanceTests
             vault.GetCertificates(Owner).Length.Should().Be(0);
 
             VerifyCall(ODX, 0, nameof(IOpdexMinedToken.TransferTo), transferToParams, Times.Once);
-            VerifyLog(new VaultCertificateRedeemedLog {Wallet = Owner, Amount = existingCertificate.Amount }, Times.Once);
+            VerifyLog(new VaultCertificateRedeemedLog {Owner = Owner, Amount = existingCertificate.Amount }, Times.Once);
         }
         
         [Fact]
@@ -201,8 +201,8 @@ namespace OpdexGovernanceTests
             certificates[6].Should().BeEquivalentTo(existingCertificates[9]);
 
             VerifyCall(ODX, 0, nameof(IOpdexMinedToken.TransferTo), transferToParams, Times.Once);
-            VerifyLog(new VaultCertificateRedeemedLog {Wallet = Owner, Amount = existingCertificates[0].Amount }, Times.Once);
-            VerifyLog(new VaultCertificateRedeemedLog {Wallet = Owner, Amount = existingCertificates[1].Amount }, Times.Once);
+            VerifyLog(new VaultCertificateRedeemedLog {Owner = Owner, Amount = existingCertificates[0].Amount }, Times.Once);
+            VerifyLog(new VaultCertificateRedeemedLog {Owner = Owner, Amount = existingCertificates[1].Amount }, Times.Once);
         }
         
         [Fact]
@@ -259,8 +259,8 @@ namespace OpdexGovernanceTests
             certificates.Length.Should().Be(0);
 
             VerifyCall(ODX, 0, nameof(IOpdexMinedToken.TransferTo), transferToParams, Times.Once);
-            VerifyLog(new VaultCertificateRedeemedLog {Wallet = Owner, Amount = existingCertificates[0].Amount }, Times.Once);
-            VerifyLog(new VaultCertificateRedeemedLog {Wallet = Owner, Amount = existingCertificates[1].Amount }, Times.Once);
+            VerifyLog(new VaultCertificateRedeemedLog {Owner = Owner, Amount = existingCertificates[0].Amount }, Times.Once);
+            VerifyLog(new VaultCertificateRedeemedLog {Owner = Owner, Amount = existingCertificates[1].Amount }, Times.Once);
         }
 
         [Fact]
@@ -290,9 +290,16 @@ namespace OpdexGovernanceTests
             
             VerifyLog(new VaultCertificateCreatedLog
             {
-                Wallet = Miner1, 
+                Owner = Miner1, 
                 Amount = transferAmount, 
                 VestedBlock = block + BlocksPerYear
+            }, Times.Once);
+            
+            VerifyLog(new VaultCertificateUpdatedLog
+            {
+                Owner = Owner,
+                Amount = expectedOpdexCertificateBalance,
+                VestedBlock = existingCertificates[0].VestedBlock
             }, Times.Once);
         }
 
@@ -328,9 +335,16 @@ namespace OpdexGovernanceTests
             
             VerifyLog(new VaultCertificateCreatedLog
             {
-                Wallet = Miner1, 
+                Owner = Miner1, 
                 Amount = transferAmount, 
                 VestedBlock = block + BlocksPerYear
+            }, Times.Once);
+            
+            VerifyLog(new VaultCertificateUpdatedLog
+            {
+                Owner = Owner,
+                Amount = expectedOpdexCertificateBalance,
+                VestedBlock = existingOwnerCertificates[0].VestedBlock
             }, Times.Once);
         }
         
@@ -359,6 +373,7 @@ namespace OpdexGovernanceTests
             minerCertificates.Should().BeEquivalentTo(new VaultCertificate[0]);
             
             VerifyLog(It.IsAny<VaultCertificateCreatedLog>(), Times.Never);
+            VerifyLog(It.IsAny<VaultCertificateUpdatedLog>(), Times.Never);
         }
         
         [Fact]

@@ -33,21 +33,15 @@ public class OpdexVault : SmartContract, IOpdexVault
         private set => State.SetAddress(nameof(Owner), value);
     }
     
-    public Address MiningGovernance
-    {
-        get => State.GetAddress(nameof(MiningGovernance));
-        private set => State.SetAddress(nameof(MiningGovernance), value);
-    }
-    
     /// <inheritdoc />
-    public VaultCertificate[] GetCertificates(Address address)
+    public VaultCertificate[] GetCertificates(Address wallet)
     {
-        return State.GetArray<VaultCertificate>($"Certificates:{address}") ?? new VaultCertificate[0];
+        return State.GetArray<VaultCertificate>($"Certificates:{wallet}") ?? new VaultCertificate[0];
     }
 
-    private void SetCertificates(Address address, VaultCertificate[] receipts)
+    private void SetCertificates(Address wallet, VaultCertificate[] receipts)
     {
-        State.SetArray($"Certificates:{address}", receipts);
+        State.SetArray($"Certificates:{wallet}", receipts);
     }
 
     /// <inheritdoc />
@@ -78,7 +72,7 @@ public class OpdexVault : SmartContract, IOpdexVault
 
             amountToTransfer += certificate.Amount;
             
-            Log(new VaultCertificateRedeemedLog {Wallet = Message.Sender, Amount = certificate.Amount});
+            Log(new VaultCertificateRedeemedLog {Owner = Message.Sender, Amount = certificate.Amount});
         }
         
         SetCertificates(Message.Sender, lockedCertificates);
@@ -106,10 +100,14 @@ public class OpdexVault : SmartContract, IOpdexVault
             Assert(newVestedBlock >= ownerCertificates[i].VestedBlock, "OPDEX: INSUFFICIENT_VESTING_PERIOD");
             
             var created = AddCertificate(to, amount, newVestedBlock);
-            
-            if (created) SetCertificates(owner, ownerCertificates);
 
-            return created;
+            if (!created) return false;
+            
+            SetCertificates(owner, ownerCertificates);
+            
+            Log(new VaultCertificateUpdatedLog {Owner = owner, Amount = ownerCertificates[i].Amount, VestedBlock = ownerCertificates[i].VestedBlock});
+
+            return true;
         }
 
         return false;
@@ -135,7 +133,7 @@ public class OpdexVault : SmartContract, IOpdexVault
         
         SetCertificates(address, certificates);
         
-        Log(new VaultCertificateCreatedLog{ Wallet = address, Amount = amount, VestedBlock = vestedBlock });
+        Log(new VaultCertificateCreatedLog{ Owner = address, Amount = amount, VestedBlock = vestedBlock });
 
         return true;
     }
