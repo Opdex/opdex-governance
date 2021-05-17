@@ -311,14 +311,16 @@ namespace OpdexGovernanceTests
         [Fact]
         public void NotifyRewardAmount_NotActive_Success()
         {
+            const ulong block = 100;
             const ulong duration = 100;
+            const ulong expectedMiningPeriodEndBlock = block + duration;
             UInt256 rewardAmount = 100_000;
             UInt256 expectedRewardRate = 1_000;
             UInt256 rewardRate = 1_000;
             
             var miningPool = CreateNewMiningPool();
             
-            SetupBlock(100);
+            SetupBlock(block);
             SetupMessage(MiningPool1, MiningGovernance);
             
             PersistentState.SetUInt64(nameof(IOpdexMiningPool.MiningDuration), duration);
@@ -331,8 +333,9 @@ namespace OpdexGovernanceTests
             miningPool.NotifyRewardAmount(rewardAmount);
 
             miningPool.RewardRate.Should().Be(expectedRewardRate);
+            miningPool.MiningPeriodEndBlock.Should().Be(block + duration);
 
-            VerifyLog(new MiningPoolRewardedLog { Amount = rewardAmount, RewardRate = rewardRate }, Times.Once);
+            VerifyLog(new MiningPoolRewardedLog { Amount = rewardAmount, RewardRate = rewardRate, MiningPeriodEndBlock = expectedMiningPeriodEndBlock}, Times.Once);
         }
 
         [Fact]
@@ -367,7 +370,7 @@ namespace OpdexGovernanceTests
             miningPool.LastUpdateBlock.Should().Be(currentBlock);
             miningPool.MiningPeriodEndBlock.Should().Be(currentBlock + duration);
 
-            VerifyLog(new MiningPoolRewardedLog { Amount = rewardAmount, RewardRate = newRewardRate }, Times.Once);
+            VerifyLog(new MiningPoolRewardedLog { Amount = rewardAmount, RewardRate = newRewardRate, MiningPeriodEndBlock = currentBlock + duration }, Times.Once);
         }
 
         [Fact]

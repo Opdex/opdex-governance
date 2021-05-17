@@ -14,10 +14,10 @@ namespace OpdexGovernanceTests
     {
         
         // 100M, 75M, 50M, 25M, 5M
-        private readonly UInt256[] DefaultVaultSchedule = { 10_000_000_000_000_000, 75_000_00000_000_000, 50_000_00000_000_000, 25_000_00000_000_000, 5_000_00000_000_000 };
+        private readonly UInt256[] DefaultVaultSchedule = { 10_000_000_000_000_000, 75_000_00000_000_000, 50_000_00000_000_000, 25_000_00000_000_000, 0 };
         
         // 300M, 225M, 150M, 75M, 20M
-        private readonly UInt256[] DefaultMiningSchedule = { 300_000_00000_000_000, 225_000_00000_000_000, 150_000_00000_000_000, 75_000_00000_000_000, 20_000_00000_000_000 };
+        private readonly UInt256[] DefaultMiningSchedule = { 300_000_00000_000_000, 225_000_00000_000_000, 150_000_00000_000_000, 75_000_00000_000_000, 25_000_00000_000_000 };
         
         [Fact]
         public void CreateContract_Success()
@@ -122,9 +122,9 @@ namespace OpdexGovernanceTests
         [InlineData(1, 10_000_000_000_000_000, 30_000_000_000_000_000, 40_000_000_000_000_000, 17_500_000_000_000_000, 52_500_000_000_000_000, 70_000_000_000_000_000)]
         [InlineData(2, 17_500_000_000_000_000, 52_500_000_000_000_000, 70_000_000_000_000_000, 22_500_000_000_000_000, 67_500_000_000_000_000, 90_000_000_000_000_000)]
         [InlineData(3, 22_500_000_000_000_000, 67_500_000_000_000_000, 90_000_000_000_000_000, 25_000_000_000_000_000, 75_000_000_000_000_000, 1_00_000_000_000_000_000)]
-        [InlineData(4, 25_000_000_000_000_000, 75_000_000_000_000_000, 100_000_000_000_000_000, 25_500_000_000_000_000, 77_000_000_000_000_000, 102_500_000_000_000_000)]
-        [InlineData(5, 25_500_000_000_000_000, 77_000_000_000_000_000, 102_500_000_000_000_000, 26_000_000_000_000_000, 79_000_000_000_000_000, 1_05_000_000_000_000_000)]
-        [InlineData(6, 26_000_000_000_000_000, 79_000_000_000_000_000, 1_05_000_000_000_000_000, 26_500_000_000_000_000, 81_000_000_000_000_000, 107_500_000_000_000_000)]
+        [InlineData(4, 25_000_000_000_000_000, 75_000_000_000_000_000, 100_000_000_000_000_000, 25_000_000_000_000_000, 77_500_000_000_000_000, 102_500_000_000_000_000)]
+        [InlineData(5, 25_000_000_000_000_000, 77_500_000_000_000_000, 102_500_000_000_000_000, 25_000_000_000_000_000, 80_000_000_000_000_000, 1_05_000_000_000_000_000)]
+        [InlineData(6, 25_000_000_000_000_000, 80_000_000_000_000_000, 1_05_000_000_000_000_000, 25_000_000_000_000_000, 82_500_000_000_000_000, 107_500_000_000_000_000)]
         public void Distribute_SubsequentYears_Success(uint periodIndex, UInt256 currentVaultBalance, UInt256 currentMiningBalance, UInt256 currentTotalSupply,
             UInt256 expectedVaultBalance, UInt256 expectedMiningBalance, UInt256 expectedTotalSupply)
         {
@@ -157,8 +157,11 @@ namespace OpdexGovernanceTests
                 : periodIndex;
             
             VerifyCall(MiningGovernance, 0, nameof(IOpdexMiningGovernance.NotifyDistribution), new byte[0], Times.Once);
-            
-            VerifyCall(Vault, 0, nameof(IOpdexVault.NotifyDistribution), notifyVaultParams, Times.Once);
+
+            if (currentVaultBalance < expectedVaultBalance)
+            {
+                VerifyCall(Vault, 0, nameof(IOpdexVault.NotifyDistribution), notifyVaultParams, Times.Once);
+            }
             
             VerifyLog(new DistributionLog
             {
@@ -193,7 +196,7 @@ namespace OpdexGovernanceTests
         }
         
         [Fact]
-        public void Distribute_Throws_FailedNotification()
+        public void Distribute_Throws_FailedVaultNotification()
         {
             const ulong genesis = 100;
             
@@ -201,8 +204,9 @@ namespace OpdexGovernanceTests
             
             var stakingTokens = Serializer.Serialize(new[] { Miner1, Pool1, ODX, Owner }); // Any 4 address, not important for this test
             
-            var callParams = new object[] { stakingTokens };
-            SetupCall(MiningGovernance, 0ul, nameof(IOpdexMiningGovernance.NotifyDistribution), callParams, TransferResult.Failed());
+            SetupCall(MiningGovernance, 0ul, nameof(IOpdexMiningGovernance.NotifyDistribution), new object[] { stakingTokens }, TransferResult.Transferred(null));
+            
+            SetupCall(Vault, 0ul, nameof(IOpdexVault.NotifyDistribution), new object[] {DefaultVaultSchedule[0]}, TransferResult.Failed());
 
             PersistentState.SetAddress(nameof(MiningGovernance), MiningGovernance);
             
@@ -210,7 +214,27 @@ namespace OpdexGovernanceTests
 
             token.Invoking(t => t.Distribute(stakingTokens))
                 .Should().Throw<SmartContractAssertException>()
-                .WithMessage("OPDEX: FAILED_DISTRIBUTION_NOTIFICATION");
+                .WithMessage("OPDEX: FAILED_VAULT_DISTRIBUTION");
+        }
+        
+        [Fact]
+        public void Distribute_Throws_FailedGovernanceNotification()
+        {
+            const ulong genesis = 100;
+            
+            var token = CreateNewOpdexToken(Serializer.Serialize(DefaultVaultSchedule), Serializer.Serialize(DefaultMiningSchedule), genesis);
+            
+            var stakingTokens = Serializer.Serialize(new[] { Miner1, Pool1, ODX, Owner }); // Any 4 address, not important for this test
+            
+            SetupCall(MiningGovernance, 0ul, nameof(IOpdexMiningGovernance.NotifyDistribution), new object[] { stakingTokens }, TransferResult.Failed());
+            
+            PersistentState.SetAddress(nameof(MiningGovernance), MiningGovernance);
+            
+            SetupBlock(genesis);
+
+            token.Invoking(t => t.Distribute(stakingTokens))
+                .Should().Throw<SmartContractAssertException>()
+                .WithMessage("OPDEX: FAILED_GOVERNANCE_DISTRIBUTION");
         }
 
         [Fact]

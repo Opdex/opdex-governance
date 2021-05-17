@@ -248,11 +248,13 @@ public class OpdexMiningPool : SmartContract, IOpdexMiningPool
         
         Assert(balanceResult.Success && balance > 0, "OPDEX: INVALID_BALANCE");
         Assert(RewardRate <= balance / miningDuration, "OPDEX: PROVIDED_REWARD_TOO_HIGH");
-
-        LastUpdateBlock = Block.Number;
-        MiningPeriodEndBlock = Block.Number + miningDuration;
         
-        Log(new MiningPoolRewardedLog { Amount = reward, RewardRate = RewardRate });
+        var miningPeriodEnd = Block.Number + miningDuration;
+        
+        MiningPeriodEndBlock = miningPeriodEnd;
+        LastUpdateBlock = Block.Number;
+
+        Log(new MiningPoolRewardedLog { Amount = reward, RewardRate = RewardRate, MiningPeriodEndBlock = miningPeriodEnd});
         
         Unlock();
     }

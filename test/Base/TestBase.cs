@@ -103,6 +103,8 @@ namespace OpdexGovernanceTests.Base
             
             SetupBalance(0);
             SetupBlock(block);
+
+            PersistentState.SetUInt64(nameof(IOpdexVault.Genesis), block);
             
             return new OpdexVault(_mockContractState.Object, ODX, Owner);
         }

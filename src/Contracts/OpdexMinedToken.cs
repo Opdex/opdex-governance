@@ -1,7 +1,7 @@
 ﻿using Stratis.SmartContracts;
 
 /// <summary>
-/// Mining token contract, used for staking in Opdex liquidity pools. Distributes to owner and mining governance
+/// Mining token contract, used for staking in Opdex liquidity pools. Distributes to vault and mining governance
 /// based on a specified duration between distributions.
 /// </summary>
 [Deploy]
@@ -11,12 +11,12 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
     /// Constructor initializing opdex token contract.
     /// </summary>
     /// <param name="state">Smart contract state.</param>
-    /// <param name="ownerDistribution">Serialized UInt256 array of owner distribution amounts.</param>
+    /// <param name="vaultDistribution">Serialized UInt256 array of vault distribution amounts.</param>
     /// <param name="miningDistribution">Serialized UInt256 array of mining distribution amounts.</param>
     /// <param name="periodDuration">The number of blocks between token distributions.</param>
-    public OpdexMinedToken(ISmartContractState state, byte[] ownerDistribution, byte[] miningDistribution, ulong periodDuration) : base(state)
+    public OpdexMinedToken(ISmartContractState state, byte[]vaultDistribution, byte[] miningDistribution, ulong periodDuration) : base(state)
     {
-        var vaultSchedule = Serializer.ToArray<UInt256>(ownerDistribution);
+        var vaultSchedule = Serializer.ToArray<UInt256>(vaultDistribution);
         var miningSchedule = Serializer.ToArray<UInt256>(miningDistribution);
 
         Assert(vaultSchedule.Length > 1 && vaultSchedule.Length == miningSchedule.Length);
@@ -160,36 +160,46 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
         if (periodIndex == 0) Assert(Message.Sender == Creator);
         
         var miningGov = MiningGovernance;
-        var owner = Creator;
         var vault = Vault;
-        var vaultSchedule = VaultSchedule;
         var miningSchedule = MiningSchedule;
+        var vaultSchedule = VaultSchedule;
         var inflationIndex = (uint)vaultSchedule.Length - 1;
         var minBlock = periodIndex == 0 ? Genesis : PeriodDuration * periodIndex + Genesis;
         
         Assert(Block.Number >= minBlock, "OPDEX: DISTRIBUTION_NOT_READY");
 
         var scheduleIndex = periodIndex < inflationIndex ? periodIndex : inflationIndex;
-        var vaultTokens = vaultSchedule[scheduleIndex];
         var miningTokens = miningSchedule[scheduleIndex];
+        var vaultTokens = vaultSchedule[scheduleIndex];
         var supplyIncrease = miningTokens + vaultTokens;
         
-        SetBalance(vault, GetBalance(vault) + vaultTokens);
-        SetBalance(miningGov, GetBalance(miningGov) + miningTokens);
+        if (miningTokens > 0)
+        {
+            SetBalance(miningGov, GetBalance(miningGov) + miningTokens);
 
-        data = periodIndex == 0 ? data : new byte[0];
-        var governanceNotification = Call(miningGov, 0ul, nameof(IOpdexMiningGovernance.NotifyDistribution), new object[] {data});
-        var vaultNotification = Call(vault, 0, nameof(IOpdexVault.NotifyDistribution), new object[] { vaultTokens });
+            data = periodIndex == 0 ? data : new byte[0];
+            
+            var governanceNotification = Call(miningGov, 0ul, nameof(IOpdexMiningGovernance.NotifyDistribution), new object[] {data});
+            
+            Assert(governanceNotification.Success, "OPDEX: FAILED_GOVERNANCE_DISTRIBUTION");
+        }
         
-        Assert(governanceNotification.Success && vaultNotification.Success, "OPDEX: FAILED_DISTRIBUTION_NOTIFICATION");
+        if (vaultTokens > 0)
+        {
+            SetBalance(vault, GetBalance(vault) + vaultTokens);
+            
+            var vaultNotification = Call(vault, 0, nameof(IOpdexVault.NotifyDistribution), new object[] { vaultTokens });
+            
+            Assert(vaultNotification.Success, "OPDEX: FAILED_VAULT_DISTRIBUTION");
+        }
 
         TotalSupply += supplyIncrease;
         PeriodIndex++;
         
         Log(new DistributionLog
         {
-            VaultAmount = vaultTokens,
             MiningAmount = miningTokens,
+            VaultAmount = vaultTokens,
             PeriodIndex = periodIndex
         });
     }

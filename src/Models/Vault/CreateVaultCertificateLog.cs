@@ -1,6 +1,6 @@
 using Stratis.SmartContracts;
 
-public struct VaultCertificateCreatedLog
+public struct CreateVaultCertificateLog
 {
     [Index] public Address Owner;
     public UInt256 Amount;

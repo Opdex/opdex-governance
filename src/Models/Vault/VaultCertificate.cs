@@ -4,4 +4,5 @@ public struct VaultCertificate
 {
     public UInt256 Amount;
     public ulong VestedBlock;
+    public bool Revoked;
 }
