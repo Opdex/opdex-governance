@@ -3,7 +3,6 @@ using Stratis.SmartContracts;
 
 public class OpdexVault : SmartContract, IOpdexVault
 {
-    private const ulong FourYears = 60 * 60 * 24 * 365 * 4 / 16;
     private const uint MaximumCertificates = 10;
     
     /// <summary>
@@ -12,11 +11,13 @@ public class OpdexVault : SmartContract, IOpdexVault
     /// <param name="state">Smart contract state.</param>
     /// <param name="token">The locked SRC token.</param>
     /// <param name="owner">The vault owner.</param>
-    public OpdexVault(ISmartContractState state, Address token, Address owner) : base(state)
+    /// <param name="vestingDuration">The length in blocks of the vesting period.</param>
+    public OpdexVault(ISmartContractState state, Address token, Address owner, ulong vestingDuration) : base(state)
     {
         Token = token;
         Owner = owner;
         Genesis = Block.Number;
+        VestingDuration = vestingDuration;
     }
 
     /// <inheritdoc />
@@ -24,6 +25,13 @@ public class OpdexVault : SmartContract, IOpdexVault
     {
         get => State.GetUInt64(nameof(Genesis));
         private set => State.SetUInt64(nameof(Genesis), value);
+    }
+    
+    /// <inheritdoc />
+    public ulong VestingDuration
+    {
+        get => State.GetUInt64(nameof(VestingDuration));
+        private set => State.SetUInt64(nameof(VestingDuration), value);
     }
 
     /// <inheritdoc />
@@ -70,17 +78,20 @@ public class OpdexVault : SmartContract, IOpdexVault
     public void CreateCertificate(Address to, UInt256 amount)
     {
         var owner = Owner;
+        var vestingDuration = VestingDuration;
         
         Assert(Message.Sender == owner, "OPDEX: UNAUTHORIZED");
         Assert(to != owner, "OPDEX: INVALID_CERTIFICATE_HOLDER");
-        Assert(Block.Number < Genesis + FourYears, "OPDEX: TOKENS_BURNED");
         Assert(amount > 0 && amount <= TotalSupply, "OPDEX: INVALID_AMOUNT");
+        // Intentionally prevent new certificates after the default vesting duration has passed, burning remaining supply        
+        Assert(Block.Number < Genesis + vestingDuration, "OPDEX: TOKENS_BURNED");
+
         
         var certificates = GetCertificates(to);
 
         Assert(certificates.Length < MaximumCertificates, "OPDEX: CERTIFICATE_LIMIT_REACHED");
         
-        var vestedBlock = Block.Number + FourYears;
+        var vestedBlock = Block.Number + vestingDuration;
 
         certificates = InsertCertificate(certificates, amount, vestedBlock);
         
@@ -121,6 +132,7 @@ public class OpdexVault : SmartContract, IOpdexVault
         Assert(Message.Sender == Owner, "OPDEX: UNAUTHORIZED");
         
         var certificates = GetCertificates(wallet);
+        var vestingDuration = VestingDuration;
 
         for (var i = 0; i < certificates.Length; i++)
         {
@@ -130,14 +142,16 @@ public class OpdexVault : SmartContract, IOpdexVault
             
             if (revoked || vestedBlock <= Block.Number) continue;
 
-            var vestingBlock = vestedBlock - FourYears;
+            var vestingBlock = vestedBlock - vestingDuration;
             var vestedBlocks = Block.Number - vestingBlock;
             var percentageOffset = (UInt256)100;
-            var divisor = FourYears * percentageOffset / vestedBlocks;
+            var divisor = vestingDuration * percentageOffset / vestedBlocks;
             var newAmount = vestingAmount * percentageOffset / divisor;
             
             certificates[i].Amount = newAmount;
             certificates[i].Revoked = true;
+
+            TotalSupply += (vestingAmount - newAmount);
 
             Log(new RevokeVaultCertificateLog {Owner = wallet, OldAmount = vestingAmount, NewAmount = newAmount, VestedBlock = certificates[i].VestedBlock});
         }

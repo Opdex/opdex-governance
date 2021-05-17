@@ -18,6 +18,7 @@ namespace OpdexGovernanceTests
             vault.Owner.Should().Be(Owner);
             vault.Token.Should().Be(ODX);
             vault.Genesis.Should().Be(10ul);
+            vault.VestingDuration.Should().Be(BlocksPerYear * 4);
             vault.GetCertificates(Owner).Length.Should().Be(0);
         }
 
@@ -392,15 +393,19 @@ namespace OpdexGovernanceTests
         [InlineData((ulong)(BlocksPerYear * 4 * .99m), 100, 99, BlocksPerYear * 4)] // vested 99% of the 4 years
         public void RevokeCertificates_Single(ulong block, UInt256 currentAmount, UInt256 expectedAmount, ulong vestedBlock)
         {
+            var totalSupply = 100;
             var existingMinerCertificates = new[] { new VaultCertificate {Amount = currentAmount, VestedBlock = vestedBlock} };
             
             var vault = CreateNewOpdexVault(block);
             
             PersistentState.SetArray($"Certificates:{Miner1}", existingMinerCertificates);
+            PersistentState.SetUInt256(nameof(IOpdexVault.TotalSupply), totalSupply);
             
             SetupMessage(Vault, Owner);
 
             vault.RevokeCertificates(Miner1);
+            
+            vault.TotalSupply.Should().Be(totalSupply + (currentAmount - expectedAmount));
 
             var minerCertificates = vault.GetCertificates(Miner1);
 
@@ -421,6 +426,8 @@ namespace OpdexGovernanceTests
         public void RevokeCertificates_Multiple()
         {
             const ulong block = BlocksPerYear * 4;
+            UInt256 currentTotalSupply = 100;
+            UInt256 expectedTotalSupply = 200;
             UInt256 certOneCurrentAmount = 100;
             UInt256 certOneExpectedAmount = 75;
             const ulong certOneVestedBlock = BlocksPerYear * 5;
@@ -437,10 +444,13 @@ namespace OpdexGovernanceTests
             var vault = CreateNewOpdexVault(block);
             
             PersistentState.SetArray($"Certificates:{Miner1}", existingMinerCertificates);
+            PersistentState.SetUInt256(nameof(IOpdexVault.TotalSupply), currentTotalSupply);
             
             SetupMessage(Vault, Owner);
 
             vault.RevokeCertificates(Miner1);
+
+            vault.TotalSupply.Should().Be(expectedTotalSupply);
 
             var minerCertificates = vault.GetCertificates(Miner1);
 
@@ -471,6 +481,7 @@ namespace OpdexGovernanceTests
         [Fact]
         public void RevokeCertificates_Skip_Revoked()
         {
+            UInt256 totalSupply = 100;
             const ulong block = BlocksPerYear * 4;
             UInt256 certOneCurrentAmount = 100;
             const ulong certOneVestedBlock = BlocksPerYear * 5;
@@ -483,10 +494,13 @@ namespace OpdexGovernanceTests
             var vault = CreateNewOpdexVault(block);
             
             PersistentState.SetArray($"Certificates:{Miner1}", existingMinerCertificates);
-            
+            PersistentState.SetUInt256(nameof(IOpdexVault.TotalSupply), totalSupply);
+
             SetupMessage(Vault, Owner);
 
             vault.RevokeCertificates(Miner1);
+
+            vault.TotalSupply.Should().Be(totalSupply);
 
             var minerCertificates = vault.GetCertificates(Miner1);
 
@@ -500,6 +514,7 @@ namespace OpdexGovernanceTests
         [Fact]
         public void RevokeCertificates_Skip_Vested()
         {
+            UInt256 totalSupply = 100;
             const ulong block = BlocksPerYear * 4;
             UInt256 certOneCurrentAmount = 100;
             
@@ -511,11 +526,14 @@ namespace OpdexGovernanceTests
             var vault = CreateNewOpdexVault(block);
             
             PersistentState.SetArray($"Certificates:{Miner1}", existingMinerCertificates);
-            
+            PersistentState.SetUInt256(nameof(IOpdexVault.TotalSupply), totalSupply);
+
             SetupMessage(Vault, Owner);
 
             vault.RevokeCertificates(Miner1);
 
+            vault.TotalSupply.Should().Be(totalSupply);
+            
             var minerCertificates = vault.GetCertificates(Miner1);
 
             minerCertificates.Single().Amount.Should().Be(certOneCurrentAmount);

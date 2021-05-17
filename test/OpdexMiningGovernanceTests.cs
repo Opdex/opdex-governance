@@ -85,16 +85,16 @@ namespace OpdexGovernanceTests
 
             // Assert
             VerifyCreate<OpdexMiningPool>(0ul, miningPool1Params, Times.Once);
-            VerifyLog(new MiningPoolCreatedLog {MiningPool = MiningPool1, StakingPool = Pool1}, Times.Once);
+            VerifyLog(new CreateMiningPoolLog {MiningPool = MiningPool1, StakingPool = Pool1}, Times.Once);
             
             VerifyCreate<OpdexMiningPool>(0ul, miningPool2Params, Times.Once);
-            VerifyLog(new MiningPoolCreatedLog {MiningPool = MiningPool2, StakingPool = Pool2}, Times.Once);
+            VerifyLog(new CreateMiningPoolLog {MiningPool = MiningPool2, StakingPool = Pool2}, Times.Once);
             
             VerifyCreate<OpdexMiningPool>(0ul, miningPool3Params, Times.Once);
-            VerifyLog(new MiningPoolCreatedLog {MiningPool = MiningPool3, StakingPool = Pool3}, Times.Once);
+            VerifyLog(new CreateMiningPoolLog {MiningPool = MiningPool3, StakingPool = Pool3}, Times.Once);
             
             VerifyCreate<OpdexMiningPool>(0ul, miningPool4Params, Times.Once);
-            VerifyLog(new MiningPoolCreatedLog {MiningPool = MiningPool4, StakingPool = Pool4}, Times.Once);
+            VerifyLog(new CreateMiningPoolLog {MiningPool = MiningPool4, StakingPool = Pool4}, Times.Once);
             
             VerifyCall(ODX, 0ul, nameof(IOpdexMinedToken.GetBalance), getBalanceParams, Times.Once);
         }
@@ -158,7 +158,7 @@ namespace OpdexGovernanceTests
             
             VerifyCreate<OpdexMiningPool>(0ul, miningPool1Params, Times.Once);
             
-            VerifyLog(new MiningPoolCreatedLog
+            VerifyLog(new CreateMiningPoolLog
             {
                 MiningPool = MiningPool1, 
                 StakingPool = Pool1
@@ -197,7 +197,7 @@ namespace OpdexGovernanceTests
             
             VerifyCreate<OpdexMiningPool>(0ul, miningPool4Params, Times.Once);
             
-            VerifyLog(new MiningPoolCreatedLog
+            VerifyLog(new CreateMiningPoolLog
             {
                 MiningPool = MiningPool4, 
                 StakingPool = Pool4
@@ -270,7 +270,7 @@ namespace OpdexGovernanceTests
             
             VerifyCreate<OpdexMiningPool>(0ul, miningPool5Params, Times.Once);
             
-            VerifyLog(new MiningPoolCreatedLog
+            VerifyLog(new CreateMiningPoolLog
             {
                 MiningPool = MiningPool5, 
                 StakingPool = Pool5

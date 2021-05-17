@@ -105,8 +105,10 @@ namespace OpdexGovernanceTests.Base
             SetupBlock(block);
 
             PersistentState.SetUInt64(nameof(IOpdexVault.Genesis), block);
+
+            const ulong vestingDuration = 60 * 60 * 24 * 365 * 4 / 16;
             
-            return new OpdexVault(_mockContractState.Object, ODX, Owner);
+            return new OpdexVault(_mockContractState.Object, ODX, Owner, vestingDuration);
         }
 
         protected void SetupMessage(Address contractAddress, Address sender, ulong value = 0)

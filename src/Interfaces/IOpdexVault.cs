@@ -23,6 +23,11 @@ public interface IOpdexVault
     UInt256 TotalSupply { get; }
     
     /// <summary>
+    /// The number of blocks required for certificates to be locked before being redeemed.
+    /// </summary>
+    ulong VestingDuration { get; }
+    
+    /// <summary>
     /// List of certificates a given address holds.
     /// </summary>
     /// <param name="wallet">The wallet address to check certificates for.</param>

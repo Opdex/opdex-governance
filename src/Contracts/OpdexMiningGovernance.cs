@@ -262,7 +262,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
         
         SetMiningPool(stakingPool, miningPool);
         
-        Log(new MiningPoolCreatedLog { MiningPool = miningPool, StakingPool = stakingPool });
+        Log(new CreateMiningPoolLog { MiningPool = miningPool, StakingPool = stakingPool });
 
         return miningPool;
     }

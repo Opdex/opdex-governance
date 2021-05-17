@@ -1,6 +1,6 @@
 using Stratis.SmartContracts;
 
-public struct MiningPoolCreatedLog
+public struct CreateMiningPoolLog
 {
     [Index] public Address StakingPool;
     [Index] public Address MiningPool;
