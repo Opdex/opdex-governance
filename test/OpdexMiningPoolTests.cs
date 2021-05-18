@@ -335,7 +335,7 @@ namespace OpdexGovernanceTests
             miningPool.RewardRate.Should().Be(expectedRewardRate);
             miningPool.MiningPeriodEndBlock.Should().Be(block + duration);
 
-            VerifyLog(new ReceivedMiningPoolTokensLog { Amount = rewardAmount, RewardRate = rewardRate, MiningPeriodEndBlock = expectedMiningPeriodEndBlock}, Times.Once);
+            VerifyLog(new EnableMiningLog { Amount = rewardAmount, RewardRate = rewardRate, MiningPeriodEndBlock = expectedMiningPeriodEndBlock}, Times.Once);
         }
 
         [Fact]
@@ -370,7 +370,7 @@ namespace OpdexGovernanceTests
             miningPool.LastUpdateBlock.Should().Be(currentBlock);
             miningPool.MiningPeriodEndBlock.Should().Be(currentBlock + duration);
 
-            VerifyLog(new ReceivedMiningPoolTokensLog { Amount = rewardAmount, RewardRate = newRewardRate, MiningPeriodEndBlock = currentBlock + duration }, Times.Once);
+            VerifyLog(new EnableMiningLog { Amount = rewardAmount, RewardRate = newRewardRate, MiningPeriodEndBlock = currentBlock + duration }, Times.Once);
         }
 
         [Fact]
