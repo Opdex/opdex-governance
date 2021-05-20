@@ -14,7 +14,7 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
     /// <param name="vaultDistribution">Serialized UInt256 array of vault distribution amounts.</param>
     /// <param name="miningDistribution">Serialized UInt256 array of mining distribution amounts.</param>
     /// <param name="periodDuration">The number of blocks between token distributions.</param>
-    public OpdexMinedToken(ISmartContractState state, byte[]vaultDistribution, byte[] miningDistribution, ulong periodDuration) : base(state)
+    public OpdexMinedToken(ISmartContractState state, byte[] vaultDistribution, byte[] miningDistribution, ulong periodDuration) : base(state)
     {
         var vaultSchedule = Serializer.ToArray<UInt256>(vaultDistribution);
         var miningSchedule = Serializer.ToArray<UInt256>(miningDistribution);
@@ -32,7 +32,7 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
         
         var miningDuration = periodDuration / 12;
         MiningGovernance = Create<OpdexMiningGovernance>(0, new object[] {Address, miningDuration}).NewContractAddress;
-        Vault = Create<OpdexVault>(0, new object[] {Address, Message.Sender}).NewContractAddress;
+        Vault = Create<OpdexVault>(0, new object[] {Address, Message.Sender, periodDuration}).NewContractAddress;
     }
     
     /// <inheritdoc />

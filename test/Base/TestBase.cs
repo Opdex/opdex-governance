@@ -82,7 +82,7 @@ namespace OpdexGovernanceTests.Base
             SetupBalance(0);
             SetupBlock(block);
             SetupCreate<OpdexMiningGovernance>(CreateResult.Succeeded(MiningGovernance), 0ul, new object[] {ODX, BlocksPerMonth});
-            SetupCreate<OpdexVault>(CreateResult.Succeeded(Vault), 0ul, new object[] {ODX, Owner});
+            SetupCreate<OpdexVault>(CreateResult.Succeeded(Vault), 0ul, new object[] {ODX, Owner, BlocksPerYear});
             
             return new OpdexMinedToken(_mockContractState.Object, ownerSchedule, miningSchedule, BlocksPerYear);
         }

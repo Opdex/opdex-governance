@@ -7,18 +7,25 @@ using Stratis.SmartContracts;
 using Stratis.SmartContracts.CLR;
 using Stratis.SmartContracts.Core;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace OpdexGovernanceTests
 {
     public class OpdexTokenTests : TestBase
     {
-        
+        private readonly ITestOutputHelper _testOutputHelper;
+
         // 100M, 75M, 50M, 25M, 5M
         private readonly UInt256[] DefaultVaultSchedule = { 10_000_000_000_000_000, 75_000_00000_000_000, 50_000_00000_000_000, 25_000_00000_000_000, 0 };
         
         // 300M, 225M, 150M, 75M, 20M
         private readonly UInt256[] DefaultMiningSchedule = { 300_000_00000_000_000, 225_000_00000_000_000, 150_000_00000_000_000, 75_000_00000_000_000, 25_000_00000_000_000 };
-        
+
+        public OpdexTokenTests(ITestOutputHelper testOutputHelper)
+        {
+            _testOutputHelper = testOutputHelper;
+        }
+
         [Fact]
         public void CreateContract_Success()
         {
@@ -129,12 +136,14 @@ namespace OpdexGovernanceTests
             UInt256 expectedVaultBalance, UInt256 expectedMiningBalance, UInt256 expectedTotalSupply)
         {
             const ulong genesis = 100;
+            const ulong periodDuration = 1000;
             
             var token = CreateNewOpdexToken(Serializer.Serialize(DefaultVaultSchedule), Serializer.Serialize(DefaultMiningSchedule), genesis);
             
             PersistentState.SetUInt256($"Balance:{Vault}", currentVaultBalance);
             PersistentState.SetUInt256($"Balance:{MiningGovernance}", currentMiningBalance);
             PersistentState.SetUInt32(nameof(IOpdexMinedToken.PeriodIndex), periodIndex);
+            PersistentState.SetUInt64(nameof(IOpdexMinedToken.PeriodDuration), periodDuration);
             PersistentState.SetUInt256(nameof(IOpdexMinedToken.TotalSupply), currentTotalSupply);
 
             var block = (BlocksPerYear * periodIndex) + genesis;
@@ -206,7 +215,7 @@ namespace OpdexGovernanceTests
             
             SetupCall(MiningGovernance, 0ul, nameof(IOpdexMiningGovernance.NotifyDistribution), new object[] { stakingTokens }, TransferResult.Transferred(null));
             
-            SetupCall(Vault, 0ul, nameof(IOpdexVault.NotifyDistribution), new object[] {DefaultVaultSchedule[0]}, TransferResult.Failed());
+            SetupCall(Vault, 0ul, nameof(IOpdexVault.NotifyDistribution), new object[] { DefaultVaultSchedule[0] }, TransferResult.Failed());
 
             PersistentState.SetAddress(nameof(MiningGovernance), MiningGovernance);
             
@@ -457,8 +466,8 @@ namespace OpdexGovernanceTests
         [Fact]
         public void Serialize_Distribution_Schedules()
         {
-            Console.WriteLine(Serializer.Serialize(DefaultVaultSchedule).ToHexString());
-            Console.WriteLine(Serializer.Serialize(DefaultMiningSchedule).ToHexString());
+            _testOutputHelper.WriteLine(Serializer.Serialize(DefaultVaultSchedule).ToHexString());
+            _testOutputHelper.WriteLine(Serializer.Serialize(DefaultMiningSchedule).ToHexString());
         }
     }
 }
