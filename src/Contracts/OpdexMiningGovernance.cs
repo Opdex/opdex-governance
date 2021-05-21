@@ -1,4 +1,3 @@
-using System;
 using Stratis.SmartContracts;
 using Stratis.SmartContracts.Standards;
 
@@ -110,7 +109,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
         
             for (var i = 0; i < stakingPools.Length; i++)
             {
-                nominations[i] = new Nomination {StakingPool = stakingPools[i]};
+                nominations[i] = new Nomination {StakingPool = stakingPools[i], Weight = 1};
             
                 Deploy(stakingPools[i]);
             }
@@ -133,16 +132,10 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
         var nomination = new Nomination {StakingPool = stakingPool, Weight = weight};
         var nominations = Nominations;
         var existingIndex = StakingPoolNominationIndex(nominations, stakingPool);
-        var currentLength = nominations.Length;
             
         if (existingIndex >= 0)
         {
             nominations[existingIndex].Weight = weight;
-        }
-        else if (currentLength < MaxNominations)
-        {
-            Array.Resize(ref nominations, currentLength + 1);           
-            nominations[currentLength] = nomination;
         }
         else
         {
@@ -170,15 +163,19 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
 
         var nominations = Nominations;
         
-        for (uint i = 0; i < MaxNominations; i++)
+        for (uint i = 0; i < nominations.Length; i++)
         {
-            if (nominations[i].StakingPool == Address.Zero) continue;
+            if (nominations[i].Weight == UInt256.Zero) continue;
             
             RewardMiningPoolExecute(nominations[i], MiningPoolReward);
             IncrementMiningPoolsFunded();
+            
+            nominations[i].Weight = UInt256.Zero;
         }
 
-        ResetNominations();
+        Nominations = nominations;
+        
+        ResetNominationPeriod();
         
         Unlock();
     }
@@ -191,21 +188,19 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
         
         var nominations = Nominations;
         
-        for (uint i = 0; i < MaxNominations; i++)
+        for (uint i = 0; i < nominations.Length; i++)
         {
-            if (nominations[i].StakingPool == Address.Zero) continue;
+            if (nominations[i].Weight == UInt256.Zero) continue;
             
             RewardMiningPoolExecute(nominations[i], MiningPoolReward);
             IncrementMiningPoolsFunded();
+
+            nominations[i].Weight = UInt256.Zero;
+            Nominations = nominations;
             
-            if (i == MaxNominations - 1)
+            if (i == nominations.Length - 1)
             {
-                ResetNominations();
-            }
-            else
-            {
-                nominations[i] = new Nomination();
-                Nominations = nominations;
+                ResetNominationPeriod();
             }
             
             break;
@@ -267,9 +262,8 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
         return miningPool;
     }
     
-    private void ResetNominations()
+    private void ResetNominationPeriod()
     {
-        Nominations = new Nomination[0];
         NominationPeriodEnd = Block.Number + MiningDuration;
     }
     
@@ -291,11 +285,12 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
 
     private static int StakingPoolNominationIndex(Nomination[] nominations, Address stakingPool)
     {
-        var max = nominations.Length < MaxNominations ? (uint)nominations.Length : MaxNominations;
-        
-        for (var i = 0; i < max; i++)
+        for (var i = 0; i < nominations.Length; i++)
         {
-            if (nominations[i].StakingPool == stakingPool) return i;
+            if (nominations[i].StakingPool == stakingPool)
+            {
+                return i;
+            }
         }
 
         return -1;
