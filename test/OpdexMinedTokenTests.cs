@@ -1,4 +1,3 @@
-using System;
 using System.Linq;
 using FluentAssertions;
 using Moq;
@@ -468,6 +467,17 @@ namespace OpdexGovernanceTests
         {
             _testOutputHelper.WriteLine(Serializer.Serialize(DefaultVaultSchedule).ToHexString());
             _testOutputHelper.WriteLine(Serializer.Serialize(DefaultMiningSchedule).ToHexString());
+        }
+
+        [Theory]
+        [InlineData("4E6F6D696E6174696F6E4C6F67", "NominationLog")]
+        public void DeserializeHexString_Success(string hex, string expectedOutput)
+        {
+            var bytes = hex.HexToByteArray();
+            var output = Serializer.ToString(bytes);
+            
+            _testOutputHelper.WriteLine(output);
+            output.Should().Be(expectedOutput);
         }
     }
 }

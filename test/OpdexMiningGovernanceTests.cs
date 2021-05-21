@@ -293,6 +293,7 @@ namespace OpdexGovernanceTests
         {
             UInt256 miningPoolReward = 100_000_000;
             const ulong currentBlock = 100_001;
+            UInt256 expectedNominationWeight = 1;
             
             var gov = CreateNewOpdexMiningGovernance();
             var nominations = new[]
@@ -341,7 +342,7 @@ namespace OpdexGovernanceTests
             {
                 var govNomination = gov.Nominations[i];
                 govNomination.StakingPool.Should().Be(nominations[i].StakingPool);
-                govNomination.Weight.Should().Be(UInt256.Zero);
+                govNomination.Weight.Should().Be(expectedNominationWeight);
             }
 
             VerifyCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToPool1Params, Times.Once);
@@ -365,6 +366,7 @@ namespace OpdexGovernanceTests
         {
             UInt256 miningPoolReward = 100_000_000;
             const ulong currentBlock = 100_001;
+            UInt256 expectedNominationWeight = 1;
             
             var gov = CreateNewOpdexMiningGovernance();
             var nominations = new[]
@@ -411,7 +413,7 @@ namespace OpdexGovernanceTests
             {
                 var govNomination = gov.Nominations[i];
                 govNomination.StakingPool.Should().Be(nominations[i].StakingPool);
-                govNomination.Weight.Should().Be(UInt256.Zero);
+                govNomination.Weight.Should().Be(expectedNominationWeight);
             }
 
             VerifyCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToPool2Params, Times.Once);
@@ -435,6 +437,7 @@ namespace OpdexGovernanceTests
             const ulong currentBlock = 100_001;
             const bool notified = true;
             const uint miningPoolsPerYear = 48;
+            UInt256 expectedNominationWeight = 1;
             
             var gov = CreateNewOpdexMiningGovernance();
             var nominations = new[]
@@ -490,7 +493,7 @@ namespace OpdexGovernanceTests
             {
                 var govNomination = gov.Nominations[i];
                 govNomination.StakingPool.Should().Be(nominations[i].StakingPool);
-                govNomination.Weight.Should().Be(UInt256.Zero);
+                govNomination.Weight.Should().Be(expectedNominationWeight);
             }
 
             VerifyCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToPool1Params, Times.Once);
@@ -572,6 +575,7 @@ namespace OpdexGovernanceTests
             UInt256 miningPoolReward = 100_000_000;
             const ulong nominationPeriodEnd = 100_000;
             const ulong currentBlock = 100_001;
+            UInt256 expectedNominationWeight = 1;
 
             var gov = CreateNewOpdexMiningGovernance();
             var nominations = new[]
@@ -609,7 +613,7 @@ namespace OpdexGovernanceTests
             {
                 var govNomination = gov.Nominations[i];
                 govNomination.StakingPool.Should().Be(nominations[i].StakingPool);
-                govNomination.Weight.Should().Be(UInt256.Zero);
+                govNomination.Weight.Should().Be(expectedNominationWeight);
             }
 
             VerifyCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToParams, Times.Once);
@@ -631,6 +635,7 @@ namespace OpdexGovernanceTests
             const bool notified = true;
             const ulong nominationPeriodEnd = 100_000;
             const ulong currentBlock = 100_001;
+            UInt256 expectedNominationWeight = 1;
 
             var gov = CreateNewOpdexMiningGovernance();
             var nominations = new[]
@@ -674,7 +679,7 @@ namespace OpdexGovernanceTests
             {
                 var govNomination = gov.Nominations[i];
                 govNomination.StakingPool.Should().Be(nominations[i].StakingPool);
-                govNomination.Weight.Should().Be(UInt256.Zero);
+                govNomination.Weight.Should().Be(expectedNominationWeight);
             }
 
             VerifyCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToParams, Times.Once);

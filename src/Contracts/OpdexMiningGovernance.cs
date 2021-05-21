@@ -175,7 +175,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
 
         Nominations = nominations;
         
-        ResetNominationPeriod();
+        ResetNominations();
         
         Unlock();
     }
@@ -195,12 +195,14 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
             RewardMiningPoolExecute(nominations[i], MiningPoolReward);
             IncrementMiningPoolsFunded();
 
-            nominations[i].Weight = UInt256.Zero;
-            Nominations = nominations;
-            
             if (i == nominations.Length - 1)
             {
-                ResetNominationPeriod();
+                ResetNominations();
+            }
+            else
+            {
+                nominations[i].Weight = UInt256.Zero;
+                Nominations = nominations;
             }
             
             break;
@@ -262,8 +264,16 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
         return miningPool;
     }
     
-    private void ResetNominationPeriod()
+    private void ResetNominations()
     {
+        var nominations = Nominations;
+        
+        for (uint i = 0; i < nominations.Length; i++)
+        {
+            nominations[i].Weight = 1;
+        }
+
+        Nominations = nominations;
         NominationPeriodEnd = Block.Number + MiningDuration;
     }
     
