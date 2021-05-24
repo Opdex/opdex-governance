@@ -37,7 +37,7 @@ namespace OpdexGovernanceTests
             token.Name.Should().Be("Opdex");
             token.Symbol.Should().Be("ODX");
             token.Decimals.Should().Be(8);
-            token.Genesis.Should().Be(10ul);
+            token.Genesis.Should().Be(0ul);
             token.TotalSupply.Should().Be(UInt256.Zero);
             token.MiningGovernance.Should().Be(MiningGovernance);
             token.GetBalance(Owner).Should().Be(UInt256.Zero);
@@ -91,6 +91,8 @@ namespace OpdexGovernanceTests
         [Fact]
         public void Distribute_InitialPeriod_Success()
         {
+            var block = 100ul;
+            
             var token = CreateNewOpdexToken(Serializer.Serialize(DefaultVaultSchedule), Serializer.Serialize(DefaultMiningSchedule));
 
             var stakingTokens = Serializer.Serialize(new[] { Miner1, Pool1, ODX, Owner }); // Any 4 address, not important for this test
@@ -104,12 +106,14 @@ namespace OpdexGovernanceTests
             var vaultCallParams = new object[] {DefaultVaultSchedule[0]};
             SetupCall(Vault, 0ul, nameof(IOpdexVault.NotifyDistribution), vaultCallParams, TransferResult.Transferred(null));
             
+            SetupBlock(block);
             token.Distribute(stakingTokens);
             
             token.GetBalance(Vault).Should().Be(DefaultVaultSchedule[0]);
             token.GetBalance(MiningGovernance).Should().Be(DefaultMiningSchedule[0]);
             token.PeriodIndex.Should().Be(1);
             token.TotalSupply.Should().Be((UInt256)40_000_000_000_000_000);
+            token.Genesis.Should().Be(block);
 
             VerifyCreate<OpdexMiningGovernance>(0ul, createParams, Times.Once);
             
@@ -144,11 +148,13 @@ namespace OpdexGovernanceTests
             PersistentState.SetUInt32(nameof(IOpdexMinedToken.PeriodIndex), periodIndex);
             PersistentState.SetUInt64(nameof(IOpdexMinedToken.PeriodDuration), periodDuration);
             PersistentState.SetUInt256(nameof(IOpdexMinedToken.TotalSupply), currentTotalSupply);
+            PersistentState.SetUInt64(nameof(IOpdexMinedToken.Genesis), genesis);
 
             var block = (BlocksPerYear * periodIndex) + genesis;
             SetupBlock(block);
 
-            SetupCall(MiningGovernance, 0, nameof(IOpdexMiningGovernance.NotifyDistribution), new byte[0], TransferResult.Transferred(null));
+            var notifyDistributionParameters = new object[] {new byte[0]};
+            SetupCall(MiningGovernance, 0, nameof(IOpdexMiningGovernance.NotifyDistribution), notifyDistributionParameters, TransferResult.Transferred(null));
             
             var notifyVaultParams = new object[] {expectedVaultBalance - currentVaultBalance};
             SetupCall(Vault, 0, nameof(IOpdexVault.NotifyDistribution), notifyVaultParams, TransferResult.Transferred(null));
@@ -159,12 +165,13 @@ namespace OpdexGovernanceTests
             token.GetBalance(MiningGovernance).Should().Be(expectedMiningBalance);
             token.PeriodIndex.Should().Be(periodIndex + 1);
             token.TotalSupply.Should().Be(expectedTotalSupply);
+            token.Genesis.Should().Be(genesis);
 
             var scheduleIndex = periodIndex > (uint) DefaultVaultSchedule.Length - 2
                 ? (uint)DefaultVaultSchedule.Length - 1
                 : periodIndex;
             
-            VerifyCall(MiningGovernance, 0, nameof(IOpdexMiningGovernance.NotifyDistribution), new byte[0], Times.Once);
+            VerifyCall(MiningGovernance, 0, nameof(IOpdexMiningGovernance.NotifyDistribution), notifyDistributionParameters, Times.Once);
 
             if (currentVaultBalance < expectedVaultBalance)
             {

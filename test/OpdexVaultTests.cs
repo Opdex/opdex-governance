@@ -17,7 +17,7 @@ namespace OpdexGovernanceTests
 
             vault.Owner.Should().Be(Owner);
             vault.Token.Should().Be(ODX);
-            vault.Genesis.Should().Be(10ul);
+            vault.Genesis.Should().Be(0);
             vault.VestingDuration.Should().Be(BlocksPerYear * 4);
             vault.GetCertificates(Owner).Length.Should().Be(0);
         }

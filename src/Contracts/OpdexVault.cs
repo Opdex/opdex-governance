@@ -11,13 +11,12 @@ public class OpdexVault : SmartContract, IOpdexVault
     /// <param name="state">Smart contract state.</param>
     /// <param name="token">The locked SRC token.</param>
     /// <param name="owner">The vault owner.</param>
-    /// <param name="vestingDuration">The length in blocks of the vesting period.</param>
-    public OpdexVault(ISmartContractState state, Address token, Address owner, ulong vestingDuration) : base(state)
+    /// <param name="distributionPeriod">The length in blocks of the vesting period.</param>
+    public OpdexVault(ISmartContractState state, Address token, Address owner, ulong distributionPeriod) : base(state)
     {
         Token = token;
         Owner = owner;
-        Genesis = Block.Number;
-        VestingDuration = vestingDuration;
+        VestingDuration = distributionPeriod * 4;
     }
 
     /// <inheritdoc />
@@ -72,6 +71,11 @@ public class OpdexVault : SmartContract, IOpdexVault
         Assert(Message.Sender == Token, "OPDEX: UNAUTHORIZED");
 
         TotalSupply += amount;
+
+        if (Genesis == 0)
+        {
+            Genesis = Block.Number;
+        }
     }
 
     /// <inheritdoc />

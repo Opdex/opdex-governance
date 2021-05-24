@@ -25,7 +25,6 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
         Symbol = "ODX";
         Decimals = 8;
         Creator = Message.Sender;
-        Genesis = Block.Number;
         VaultSchedule = vaultSchedule;
         MiningSchedule = miningSchedule;
         PeriodDuration = periodDuration;
@@ -157,7 +156,11 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
     public void Distribute(byte[] data)
     {
         var periodIndex = PeriodIndex;
-        if (periodIndex == 0) Assert(Message.Sender == Creator);
+        if (periodIndex == 0)
+        {
+            Assert(Message.Sender == Creator);
+            Genesis = Block.Number;
+        }
         
         var miningGov = MiningGovernance;
         var vault = Vault;
