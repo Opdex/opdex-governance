@@ -14,10 +14,10 @@ namespace OpdexGovernanceTests
     {
         private readonly ITestOutputHelper _testOutputHelper;
 
-        // 100M, 75M, 50M, 25M, 5M
+        // 100M, 75M, 50M, 25M, 0
         private readonly UInt256[] DefaultVaultSchedule = { 10_000_000_000_000_000, 75_000_00000_000_000, 50_000_00000_000_000, 25_000_00000_000_000, 0 };
         
-        // 300M, 225M, 150M, 75M, 20M
+        // 300M, 225M, 150M, 75M, 25M
         private readonly UInt256[] DefaultMiningSchedule = { 300_000_00000_000_000, 225_000_00000_000_000, 150_000_00000_000_000, 75_000_00000_000_000, 25_000_00000_000_000 };
 
         public OpdexTokenTests(ITestOutputHelper testOutputHelper)
@@ -95,7 +95,7 @@ namespace OpdexGovernanceTests
             
             var token = CreateNewOpdexToken(Serializer.Serialize(DefaultVaultSchedule), Serializer.Serialize(DefaultMiningSchedule));
 
-            var stakingTokens = Serializer.Serialize(new[] { Miner1, Pool1, ODX, Owner }); // Any 4 address, not important for this test
+            var stakingTokens = Serializer.Serialize(new[] { Miner, Pool1, ODX, Owner }); // Any 4 address, not important for this test
 
             var createParams = new object[] { ODX, BlocksPerMonth };
             SetupCreate<OpdexMiningGovernance>(CreateResult.Succeeded(MiningGovernance), 0ul, createParams);
@@ -217,7 +217,7 @@ namespace OpdexGovernanceTests
             
             var token = CreateNewOpdexToken(Serializer.Serialize(DefaultVaultSchedule), Serializer.Serialize(DefaultMiningSchedule), genesis);
             
-            var stakingTokens = Serializer.Serialize(new[] { Miner1, Pool1, ODX, Owner }); // Any 4 address, not important for this test
+            var stakingTokens = Serializer.Serialize(new[] { Miner, Pool1, ODX, Owner }); // Any 4 address, not important for this test
             
             SetupCall(MiningGovernance, 0ul, nameof(IOpdexMiningGovernance.NotifyDistribution), new object[] { stakingTokens }, TransferResult.Transferred(null));
             
@@ -239,7 +239,7 @@ namespace OpdexGovernanceTests
             
             var token = CreateNewOpdexToken(Serializer.Serialize(DefaultVaultSchedule), Serializer.Serialize(DefaultMiningSchedule), genesis);
             
-            var stakingTokens = Serializer.Serialize(new[] { Miner1, Pool1, ODX, Owner }); // Any 4 address, not important for this test
+            var stakingTokens = Serializer.Serialize(new[] { Miner, Pool1, ODX, Owner }); // Any 4 address, not important for this test
             
             SetupCall(MiningGovernance, 0ul, nameof(IOpdexMiningGovernance.NotifyDistribution), new object[] { stakingTokens }, TransferResult.Failed());
             
@@ -280,7 +280,7 @@ namespace OpdexGovernanceTests
             const ulong genesis = 100;
             var token = CreateNewOpdexToken(Serializer.Serialize(DefaultVaultSchedule), Serializer.Serialize(DefaultMiningSchedule), genesis);
 
-            SetupMessage(MiningGovernance, Miner1);
+            SetupMessage(MiningGovernance, Miner);
 
             token.Invoking(t => t.NominateLiquidityPool())
                 .Should()
@@ -315,14 +315,14 @@ namespace OpdexGovernanceTests
 
             SetupMessage(MiningGovernance, Pool1);
             
-            PersistentState.SetUInt256($"Balance:{Miner1}", ownerBalance);
-            PersistentState.SetUInt256($"Allowance:{Miner1}:{Pool1}", spenderAllowance);
+            PersistentState.SetUInt256($"Balance:{Miner}", ownerBalance);
+            PersistentState.SetUInt256($"Allowance:{Miner}:{Pool1}", spenderAllowance);
 
-            token.TransferFrom(Miner1, Owner, spenderAllowance).Should().BeTrue();
+            token.TransferFrom(Miner, Owner, spenderAllowance).Should().BeTrue();
 
             VerifyLog(new TransferLog
             {
-                From = Miner1,
+                From = Miner,
                 To = Owner,
                 Amount = spenderAllowance
             }, Times.Once);
@@ -336,18 +336,18 @@ namespace OpdexGovernanceTests
             
             var token = CreateNewOpdexToken(Serializer.Serialize(DefaultVaultSchedule), Serializer.Serialize(DefaultMiningSchedule));
 
-            SetupMessage(MiningGovernance, Miner1);
+            SetupMessage(MiningGovernance, Miner);
             
             PersistentState.SetUInt256($"Balance:{Owner}", ownerBalance);
-            PersistentState.SetUInt256($"Allowance:{Owner}:{Miner1}", spenderAllowance);
+            PersistentState.SetUInt256($"Allowance:{Owner}:{Miner}", spenderAllowance);
 
-            token.TransferFrom(Owner, Miner1, spenderAllowance + 1).Should().BeFalse();
+            token.TransferFrom(Owner, Miner, spenderAllowance + 1).Should().BeFalse();
             token.GetBalance(Owner).Should().Be(ownerBalance);
-            token.Allowance(Owner, Miner1).Should().Be(spenderAllowance);
+            token.Allowance(Owner, Miner).Should().Be(spenderAllowance);
 
             VerifyLog(new TransferLog
             {
-                From = Miner1,
+                From = Miner,
                 To = Owner,
                 Amount = spenderAllowance
             }, Times.Never);
@@ -363,14 +363,14 @@ namespace OpdexGovernanceTests
 
             SetupMessage(MiningGovernance, Pool1);
             
-            PersistentState.SetUInt256($"Balance:{Miner1}", ownerBalance);
-            PersistentState.SetUInt256($"Allowance:{Miner1}:{Pool1}", spenderAllowance);
+            PersistentState.SetUInt256($"Balance:{Miner}", ownerBalance);
+            PersistentState.SetUInt256($"Allowance:{Miner}:{Pool1}", spenderAllowance);
 
-            token.TransferFrom(Miner1, Owner, spenderAllowance).Should().BeFalse();
+            token.TransferFrom(Miner, Owner, spenderAllowance).Should().BeFalse();
 
             VerifyLog(new TransferLog
             {
-                From = Miner1,
+                From = Miner,
                 To = Owner,
                 Amount = spenderAllowance
             }, Times.Never);
@@ -383,15 +383,15 @@ namespace OpdexGovernanceTests
         {
             var token = CreateNewOpdexToken(Serializer.Serialize(DefaultVaultSchedule), Serializer.Serialize(DefaultMiningSchedule));
 
-            SetupMessage(MiningGovernance, Miner1);
+            SetupMessage(MiningGovernance, Miner);
             
-            PersistentState.SetUInt256($"Balance:{Miner1}", ownerBalance);
+            PersistentState.SetUInt256($"Balance:{Miner}", ownerBalance);
 
             token.TransferTo(Owner, transferAmount).Should().BeTrue();
 
             VerifyLog(new TransferLog
             {
-                From = Miner1,
+                From = Miner,
                 To = Owner,
                 Amount = transferAmount
             }, Times.Once);
@@ -405,15 +405,15 @@ namespace OpdexGovernanceTests
             
             var token = CreateNewOpdexToken(Serializer.Serialize(DefaultVaultSchedule), Serializer.Serialize(DefaultMiningSchedule));
 
-            SetupMessage(MiningGovernance, Miner1);
+            SetupMessage(MiningGovernance, Miner);
             
-            PersistentState.SetUInt256($"Balance:{Miner1}", ownerBalance);
+            PersistentState.SetUInt256($"Balance:{Miner}", ownerBalance);
 
             token.TransferTo(Owner, transferAmount).Should().BeFalse();
 
             VerifyLog(new TransferLog
             {
-                From = Miner1,
+                From = Miner,
                 To = Owner,
                 Amount = transferAmount
             }, Times.Never);
@@ -428,16 +428,16 @@ namespace OpdexGovernanceTests
             
             var token = CreateNewOpdexToken(Serializer.Serialize(DefaultVaultSchedule), Serializer.Serialize(DefaultMiningSchedule));
 
-            SetupMessage(MiningGovernance, Miner1);
+            SetupMessage(MiningGovernance, Miner);
             
-            PersistentState.SetUInt256($"Balance:{Miner1}", ownerBalance);
-            PersistentState.SetUInt256($"Allowance:{Miner1}:{Owner}", currentAmount);
+            PersistentState.SetUInt256($"Balance:{Miner}", ownerBalance);
+            PersistentState.SetUInt256($"Allowance:{Miner}:{Owner}", currentAmount);
 
             token.Approve(Owner, currentAmount, amount).Should().BeTrue();
 
             VerifyLog(new ApprovalLog
             {
-                Owner = Miner1,
+                Owner = Miner,
                 Spender = Owner,
                 Amount = amount,
                 OldAmount = currentAmount
@@ -453,16 +453,16 @@ namespace OpdexGovernanceTests
             
             var token = CreateNewOpdexToken(Serializer.Serialize(DefaultVaultSchedule), Serializer.Serialize(DefaultMiningSchedule));
 
-            SetupMessage(MiningGovernance, Miner1);
+            SetupMessage(MiningGovernance, Miner);
             
-            PersistentState.SetUInt256($"Balance:{Miner1}", ownerBalance);
-            PersistentState.SetUInt256($"Allowance:{Miner1}:{Owner}", 0);
+            PersistentState.SetUInt256($"Balance:{Miner}", ownerBalance);
+            PersistentState.SetUInt256($"Allowance:{Miner}:{Owner}", 0);
 
             token.Approve(Owner, currentAmount, amount).Should().BeFalse();
 
             VerifyLog(new ApprovalLog
             {
-                Owner = Miner1,
+                Owner = Miner,
                 Spender = Owner,
                 Amount = amount,
                 OldAmount = currentAmount

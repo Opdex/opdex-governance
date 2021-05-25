@@ -1,8 +1,8 @@
 ﻿using Stratis.SmartContracts;
 
 /// <summary>
-/// Mining token contract, used for staking in Opdex liquidity pools. Distributes to vault and mining governance
-/// based on a specified duration between distributions.
+/// Mined token contract distributed through a Vault and Mining Governance smart contract.
+/// Mined to use for governance voting though staking for liquidity mining. 
 /// </summary>
 [Deploy]
 public class OpdexMinedToken : SmartContract, IOpdexMinedToken

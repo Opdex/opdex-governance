@@ -39,9 +39,9 @@ namespace OpdexGovernanceTests
             const ulong genesis = 100;
             var gov = CreateNewOpdexMiningGovernance(genesis);
             
-            PersistentState.SetAddress($"MiningPool:{ODX}", Miner1);
+            PersistentState.SetAddress($"MiningPool:{ODX}", Miner);
 
-            gov.GetMiningPool(ODX).Should().Be(Miner1);
+            gov.GetMiningPool(ODX).Should().Be(Miner);
         }
 
         [Fact]
@@ -116,7 +116,7 @@ namespace OpdexGovernanceTests
         {
             var gov = CreateNewOpdexMiningGovernance();
 
-            SetupMessage(MiningGovernance, Miner1);
+            SetupMessage(MiningGovernance, Miner);
             
             gov
                 .Invoking(g => g.NotifyDistribution(new byte[0]))
@@ -257,7 +257,7 @@ namespace OpdexGovernanceTests
             
             var gov = CreateNewOpdexMiningGovernance();
 
-            SetupMessage(MiningGovernance, Miner1);
+            SetupMessage(MiningGovernance, Miner);
             
             gov
                 .Invoking(g => g.NominateLiquidityPool(Pool5, nominationWeight))
@@ -284,7 +284,7 @@ namespace OpdexGovernanceTests
                 new Nomination {StakingPool = Pool4, Weight = 200_000_000}
             };
 
-            SetupMessage(MiningGovernance, Miner1);
+            SetupMessage(MiningGovernance, Miner);
             SetupBlock(currentBlock);
 
             var transferToPool1Params = new object[] { MiningPool1, miningPoolReward };
@@ -357,7 +357,7 @@ namespace OpdexGovernanceTests
                 new Nomination {StakingPool = Pool4, Weight = 200_000_000}
             };
 
-            SetupMessage(MiningGovernance, Miner1);
+            SetupMessage(MiningGovernance, Miner);
             SetupBlock(currentBlock);
 
             var transferToPool2Params = new object[] { MiningPool2, miningPoolReward };
@@ -428,7 +428,7 @@ namespace OpdexGovernanceTests
                 new Nomination {StakingPool = Pool4, Weight = 200_000_000}
             };
 
-            SetupMessage(MiningGovernance, Miner1);
+            SetupMessage(MiningGovernance, Miner);
             SetupBlock(currentBlock);
 
             var transferToPool1Params = new object[] { MiningPool1, miningPoolReward };
@@ -511,7 +511,7 @@ namespace OpdexGovernanceTests
                 new Nomination {StakingPool = Pool4, Weight = 200_000_000}
             };
 
-            SetupMessage(MiningGovernance, Miner1);
+            SetupMessage(MiningGovernance, Miner);
             SetupBlock(ulong.MaxValue);
 
             var transferToParams = new object[] { MiningPool1, miningPoolReward };
@@ -566,7 +566,7 @@ namespace OpdexGovernanceTests
                 new Nomination {StakingPool = Pool4, Weight = 200_000_000}
             };
 
-            SetupMessage(MiningGovernance, Miner1);
+            SetupMessage(MiningGovernance, Miner);
             SetupBlock(currentBlock);
 
             // Transfer rewards to mining pool
@@ -626,7 +626,7 @@ namespace OpdexGovernanceTests
                 new Nomination {StakingPool = Pool4, Weight = 200_000_000}
             };
 
-            SetupMessage(MiningGovernance, Miner1);
+            SetupMessage(MiningGovernance, Miner);
             SetupBlock(currentBlock);
 
             // Transfer rewards to mining pool
@@ -692,7 +692,7 @@ namespace OpdexGovernanceTests
                 new Nomination {StakingPool = Pool4, Weight = 200_000_000}
             };
 
-            SetupMessage(MiningGovernance, Miner1);
+            SetupMessage(MiningGovernance, Miner);
             SetupBlock(currentBlock);
 
             // Transfer rewards to mining pool
@@ -738,7 +738,7 @@ namespace OpdexGovernanceTests
                 new Nomination {StakingPool = Pool4, Weight = 200_000_000}
             };
 
-            SetupMessage(MiningGovernance, Miner1);
+            SetupMessage(MiningGovernance, Miner);
             SetupBlock(currentBlock);
 
             // Transfer rewards to mining pool
@@ -784,7 +784,7 @@ namespace OpdexGovernanceTests
                 new Nomination {StakingPool = Pool4, Weight = 200_000_000}
             };
 
-            SetupMessage(MiningGovernance, Miner1);
+            SetupMessage(MiningGovernance, Miner);
             SetupBlock(currentBlock);
 
             var transferToParams = new object[] { MiningPool4, miningPoolReward };

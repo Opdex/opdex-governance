@@ -141,7 +141,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
         {
             var index = LowestNominationWeightIndex(nominations);
             var lowest = nominations[index];
-            if (lowest.Weight >= nomination.Weight) {return;}
+            if (lowest.Weight >= nomination.Weight) return;
             nominations[index] = nomination;
         }
 

@@ -1,6 +1,9 @@
 using System;
 using Stratis.SmartContracts;
 
+/// <summary>
+/// A smart contract that locks tokens for a specified vesting period. 
+/// </summary>
 public class OpdexVault : SmartContract, IOpdexVault
 {
     private const uint MaximumCertificates = 10;
@@ -72,10 +75,7 @@ public class OpdexVault : SmartContract, IOpdexVault
 
         TotalSupply += amount;
 
-        if (Genesis == 0)
-        {
-            Genesis = Block.Number;
-        }
+        if (Genesis == 0) Genesis = Block.Number;
     }
 
     /// <inheritdoc />
@@ -87,9 +87,7 @@ public class OpdexVault : SmartContract, IOpdexVault
         Assert(Message.Sender == owner, "OPDEX: UNAUTHORIZED");
         Assert(to != owner, "OPDEX: INVALID_CERTIFICATE_HOLDER");
         Assert(amount > 0 && amount <= TotalSupply, "OPDEX: INVALID_AMOUNT");
-        // Intentionally prevent new certificates after the default vesting duration has passed, burning remaining supply        
         Assert(Block.Number < Genesis + vestingDuration, "OPDEX: TOKENS_BURNED");
-
         
         var certificates = GetCertificates(to);
 
@@ -97,7 +95,7 @@ public class OpdexVault : SmartContract, IOpdexVault
         
         var vestedBlock = Block.Number + vestingDuration;
 
-        certificates = InsertCertificate(certificates, amount, vestedBlock);
+        certificates = InsertCertificate(certificates, amount, vestedBlock, false);
         
         SetCertificates(to, certificates);
 
@@ -117,7 +115,7 @@ public class OpdexVault : SmartContract, IOpdexVault
         {
             if (certificate.VestedBlock > Block.Number)
             {
-                lockedCertificates = InsertCertificate(lockedCertificates, certificate.Amount, certificate.VestedBlock);
+                lockedCertificates = InsertCertificate(lockedCertificates, certificate.Amount, certificate.VestedBlock, certificate.Revoked);
                 continue;
             }
 
@@ -173,13 +171,13 @@ public class OpdexVault : SmartContract, IOpdexVault
         Log(new ChangeVaultOwnerLog { From = Message.Sender, To = owner });
     }
 
-    private static VaultCertificate[] InsertCertificate(VaultCertificate[] certificates, UInt256 amount, ulong vestedBlock)
+    private static VaultCertificate[] InsertCertificate(VaultCertificate[] certificates, UInt256 amount, ulong vestedBlock, bool revoked)
     {
         var originalLength = certificates.Length;
         
         Array.Resize(ref certificates, originalLength + 1);
 
-        certificates[originalLength] = new VaultCertificate { Amount = amount, VestedBlock = vestedBlock };
+        certificates[originalLength] = new VaultCertificate { Amount = amount, VestedBlock = vestedBlock, Revoked = revoked};
 
         return certificates;
     }

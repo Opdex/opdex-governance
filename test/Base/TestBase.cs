@@ -1,5 +1,4 @@
 using System;
-using FluentAssertions;
 using Moq;
 using Stratis.Bitcoin.Features.PoA;
 using Stratis.SmartContracts;
@@ -23,9 +22,7 @@ namespace OpdexGovernanceTests.Base
         protected readonly Address MiningPool5;
         protected readonly Address Owner;
         protected readonly Address Vault;
-        protected readonly Address Miner1;
-        protected readonly Address Miner2;
-        protected readonly Address Miner3;
+        protected readonly Address Miner;
         protected readonly Address Pool1;
         protected readonly Address Pool2;
         protected readonly Address Pool3;
@@ -54,15 +51,13 @@ namespace OpdexGovernanceTests.Base
             MiningPool4 = "0x0000000000000000000000000000000000000006".HexToAddress();
             MiningPool5 = "0x0000000000000000000000000000000000000007".HexToAddress();
             Owner = "0x0000000000000000000000000000000000000008".HexToAddress();
-            Miner1 = "0x0000000000000000000000000000000000000009".HexToAddress();
-            Miner2 = "0x0000000000000000000000000000000000000010".HexToAddress();
-            Miner3 = "0x0000000000000000000000000000000000000011".HexToAddress();
-            Pool1 = "0x0000000000000000000000000000000000000012".HexToAddress();
-            Pool2 = "0x0000000000000000000000000000000000000013".HexToAddress();
-            Pool3 = "0x0000000000000000000000000000000000000014".HexToAddress();
-            Pool4 = "0x0000000000000000000000000000000000000015".HexToAddress();
-            Pool5 = "0x0000000000000000000000000000000000000016".HexToAddress();
-            Vault = "0x0000000000000000000000000000000000000017".HexToAddress();
+            Miner = "0x0000000000000000000000000000000000000009".HexToAddress();
+            Pool1 = "0x0000000000000000000000000000000000000010".HexToAddress();
+            Pool2 = "0x0000000000000000000000000000000000000011".HexToAddress();
+            Pool3 = "0x0000000000000000000000000000000000000012".HexToAddress();
+            Pool4 = "0x0000000000000000000000000000000000000013".HexToAddress();
+            Pool5 = "0x0000000000000000000000000000000000000014".HexToAddress();
+            Vault = "0x0000000000000000000000000000000000000015".HexToAddress();
         }
 
         protected IOpdexMiningGovernance CreateNewOpdexMiningGovernance(ulong block = 10)
@@ -175,8 +170,16 @@ namespace OpdexGovernanceTests.Base
             {
                 return false;
             }
+            
+            for (var i = 0; i < expected.Length; i++)
+            {
+                if (expected[i].ToString() != actual[i].ToString())
+                {
+                    return false;
+                }
+            }
 
-            return expected.ToString() == actual.ToString();
+            return true;
         }
     }
 }

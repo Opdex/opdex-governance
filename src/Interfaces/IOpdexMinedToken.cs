@@ -19,7 +19,7 @@ public interface IOpdexMinedToken : IStandardToken256
     Address Vault { get; }
     
     /// <summary>
-    /// The scheduled amounts to mint to the owner.
+    /// The scheduled amounts to mint to the vault.
     /// </summary>
     UInt256[] VaultSchedule { get; }
     
@@ -29,7 +29,7 @@ public interface IOpdexMinedToken : IStandardToken256
     UInt256[] MiningSchedule { get; }
     
     /// <summary>
-    /// The initial block the token can start being distributed.
+    /// The initial block the token was first distributed at.
     /// </summary>
     ulong Genesis { get; }
     
@@ -54,7 +54,7 @@ public interface IOpdexMinedToken : IStandardToken256
     string Name { get; }
     
     /// <summary>
-    /// Mints and distributes tokens according to the owner and mining period schedules.
+    /// Mints and distributes tokens according to the vault and mining period schedules.
     /// </summary>
     /// <param name="data">
     /// Serialized Address[] of initial staking pools to be granted funds for liquidity mining.
