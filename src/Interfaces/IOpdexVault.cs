@@ -3,12 +3,12 @@ using Stratis.SmartContracts;
 public interface IOpdexVault
 {
     /// <summary>
-    /// The genesis block of the vault contract.
+    /// The genesis block of the vault contract at the time it first received tokens.
     /// </summary>
     ulong Genesis { get; }
     
     /// <summary>
-    /// The token the vault is responsible for locking.
+    /// The SRC token the vault is responsible for locking.
     /// </summary>
     Address Token { get; }
     
@@ -18,7 +18,7 @@ public interface IOpdexVault
     Address Owner { get; }
     
     /// <summary>
-    /// The total supply of the tokens held by this contract.
+    /// The total supply of tokens available to be locked in certificates.
     /// </summary>
     UInt256 TotalSupply { get; }
     
@@ -35,19 +35,13 @@ public interface IOpdexVault
     VaultCertificate[] GetCertificates(Address wallet);
     
     /// <summary>
-    /// Method to allow the token to notify the vault of distribution and to assign a new certificate to the vault owner.
+    /// Method to allow the token to notify the vault of distribution to update the vault's total supply.
     /// </summary>
-    /// <remarks>
-    /// The vault owner can be reassigned to a new address. Any address can hold onto a maximum of 10 certificates.
-    /// If the owner has 10 unclaimed certificates, the distributed tokens to the vault contract will be intentionally
-    /// burned because they will not have a certificate that represents them.
-    /// </remarks>
     /// <param name="amount">The amount of tokens to lock and create a certificate for.</param>
     void NotifyDistribution(UInt256 amount);
     
     /// <summary>
-    /// Allows the vault owner to issue new certificates to wallet addresses with a set vesting period. Created
-    /// certificates deduct tokens from existing certificates held by the owner.
+    /// Allows the vault owner to issue new certificates to wallet addresses with a set vesting period.
     /// </summary>
     /// <param name="to">The address to assign the certificate of tokens to.</param>
     /// <param name="amount">The amount of tokens to assign to the certificate.</param>

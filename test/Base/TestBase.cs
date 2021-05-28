@@ -1,5 +1,4 @@
 using System;
-using FluentAssertions;
 using Moq;
 using Stratis.Bitcoin.Features.PoA;
 using Stratis.SmartContracts;
@@ -23,9 +22,7 @@ namespace OpdexGovernanceTests.Base
         protected readonly Address MiningPool5;
         protected readonly Address Owner;
         protected readonly Address Vault;
-        protected readonly Address Miner1;
-        protected readonly Address Miner2;
-        protected readonly Address Miner3;
+        protected readonly Address Miner;
         protected readonly Address Pool1;
         protected readonly Address Pool2;
         protected readonly Address Pool3;
@@ -54,15 +51,13 @@ namespace OpdexGovernanceTests.Base
             MiningPool4 = "0x0000000000000000000000000000000000000006".HexToAddress();
             MiningPool5 = "0x0000000000000000000000000000000000000007".HexToAddress();
             Owner = "0x0000000000000000000000000000000000000008".HexToAddress();
-            Miner1 = "0x0000000000000000000000000000000000000009".HexToAddress();
-            Miner2 = "0x0000000000000000000000000000000000000010".HexToAddress();
-            Miner3 = "0x0000000000000000000000000000000000000011".HexToAddress();
-            Pool1 = "0x0000000000000000000000000000000000000012".HexToAddress();
-            Pool2 = "0x0000000000000000000000000000000000000013".HexToAddress();
-            Pool3 = "0x0000000000000000000000000000000000000014".HexToAddress();
-            Pool4 = "0x0000000000000000000000000000000000000015".HexToAddress();
-            Pool5 = "0x0000000000000000000000000000000000000016".HexToAddress();
-            Vault = "0x0000000000000000000000000000000000000017".HexToAddress();
+            Miner = "0x0000000000000000000000000000000000000009".HexToAddress();
+            Pool1 = "0x0000000000000000000000000000000000000010".HexToAddress();
+            Pool2 = "0x0000000000000000000000000000000000000011".HexToAddress();
+            Pool3 = "0x0000000000000000000000000000000000000012".HexToAddress();
+            Pool4 = "0x0000000000000000000000000000000000000013".HexToAddress();
+            Pool5 = "0x0000000000000000000000000000000000000014".HexToAddress();
+            Vault = "0x0000000000000000000000000000000000000015".HexToAddress();
         }
 
         protected IOpdexMiningGovernance CreateNewOpdexMiningGovernance(ulong block = 10)
@@ -87,28 +82,14 @@ namespace OpdexGovernanceTests.Base
             return new OpdexMinedToken(_mockContractState.Object, ownerSchedule, miningSchedule, BlocksPerYear);
         }
 
-        protected IOpdexMiningPool CreateNewMiningPool(ulong block = 10)
-        {
-            _mockContractState.Setup(x => x.Message).Returns(new Message(MiningPool1, ODX, 0));
-            
-            SetupBalance(0);
-            SetupBlock(block);
-            
-            return new OpdexMiningPool(_mockContractState.Object, MiningGovernance, ODX, Pool1, BlocksPerMonth);
-        }
-
         protected IOpdexVault CreateNewOpdexVault(ulong block = 10)
         {
             _mockContractState.Setup(x => x.Message).Returns(new Message(MiningPool1, ODX, 0));
             
             SetupBalance(0);
             SetupBlock(block);
-
-            PersistentState.SetUInt64(nameof(IOpdexVault.Genesis), block);
-
-            const ulong vestingDuration = 60 * 60 * 24 * 365 * 4 / 16;
             
-            return new OpdexVault(_mockContractState.Object, ODX, Owner, vestingDuration);
+            return new OpdexVault(_mockContractState.Object, ODX, Owner, BlocksPerYear);
         }
 
         protected void SetupMessage(Address contractAddress, Address sender, ulong value = 0)
@@ -131,17 +112,9 @@ namespace OpdexGovernanceTests.Base
         protected void SetupCall(Address to, ulong amountToTransfer, string methodName, object[] parameters, TransferResult result, Action callback = null)
         {
             _mockInternalExecutor
-                .Setup(x => x.Call(_mockContractState.Object, to, amountToTransfer, methodName, parameters, It.IsAny<ulong>()))
-                .Returns(result)
-                .Callback(() => SetupContractCallMockCallback(amountToTransfer, callback));
-        }
-        
-        protected void SetupCall(Address to, ulong amountToTransfer, string methodName, byte[] emptyBytes, TransferResult result, Action callback = null)
-        {
-            emptyBytes.Should().BeEquivalentTo(new byte[0]);
-            
-            _mockInternalExecutor
-                .Setup(x => x.Call(_mockContractState.Object, to, amountToTransfer, methodName, It.IsAny<object[]>(), It.IsAny<ulong>()))
+                .Setup(x => 
+                    x.Call(_mockContractState.Object, to, amountToTransfer, methodName, 
+                        It.Is<object[]>(p => ValidateParameters(parameters, p)), It.IsAny<ulong>()))
                 .Returns(result)
                 .Callback(() => SetupContractCallMockCallback(amountToTransfer, callback));
         }
@@ -156,18 +129,6 @@ namespace OpdexGovernanceTests.Base
             callback?.Invoke();
         }
 
-        protected void SetupTransfer(Address to, ulong value, TransferResult result)
-        {
-            _mockInternalExecutor
-                .Setup(x => x.Transfer(_mockContractState.Object, to, value))
-                .Returns(result)
-                .Callback(() =>
-                {
-                    var balance = _mockContractState.Object.GetBalance();
-                    _mockContractState.Setup(x => x.GetBalance).Returns(() => checked(balance - value));
-                });
-        }
-
         protected void SetupCreate<T>(CreateResult result, ulong amount = 0, object[] parameters = null)
         {
             _mockInternalExecutor
@@ -177,13 +138,9 @@ namespace OpdexGovernanceTests.Base
 
         protected void VerifyCall(Address addressTo, ulong amountToTransfer, string methodName, object[] parameters, Func<Times> times)
         {
-            _mockInternalExecutor.Verify(x => x.Call(_mockContractState.Object, addressTo, amountToTransfer, methodName, parameters, 0ul), times);
-        }
-        
-        protected void VerifyCall(Address addressTo, ulong amountToTransfer, string methodName, byte[] emptyBytes, Func<Times> times)
-        {
-            emptyBytes.Should().BeEquivalentTo(new byte[0]);
-            _mockInternalExecutor.Verify(x => x.Call(_mockContractState.Object, addressTo, amountToTransfer, methodName, It.IsAny<object[]>(), 0ul), times);
+            _mockInternalExecutor.Verify(x => 
+                x.Call(_mockContractState.Object, addressTo, amountToTransfer, methodName, 
+                    It.Is<object[]>(p => ValidateParameters(parameters, p)), 0ul), times);
         }
 
         protected void VerifyTransfer(Address to, ulong value, Func<Times> times)
@@ -200,6 +157,29 @@ namespace OpdexGovernanceTests.Base
             where T : struct
         {
             _mockContractLogger.Verify(x => x.Log(_mockContractState.Object, expectedLog), times);
+        }
+        
+        private static bool ValidateParameters(object[] expected, object[] actual)
+        {
+            if (expected == null && actual == null)
+            {
+                return true;
+            }
+
+            if (expected == null ^ actual == null)
+            {
+                return false;
+            }
+            
+            for (var i = 0; i < expected.Length; i++)
+            {
+                if (expected[i].ToString() != actual[i].ToString())
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
     }
 }

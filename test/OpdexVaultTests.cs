@@ -17,7 +17,7 @@ namespace OpdexGovernanceTests
 
             vault.Owner.Should().Be(Owner);
             vault.Token.Should().Be(ODX);
-            vault.Genesis.Should().Be(10ul);
+            vault.Genesis.Should().Be(0);
             vault.VestingDuration.Should().Be(BlocksPerYear * 4);
             vault.GetCertificates(Owner).Length.Should().Be(0);
         }
@@ -45,7 +45,7 @@ namespace OpdexGovernanceTests
         {
             var vault = CreateNewOpdexVault();
             
-            SetupMessage(Vault, Miner1);
+            SetupMessage(Vault, Miner);
 
             vault
                 .Invoking(v => v.NotifyDistribution(UInt256.MaxValue))
@@ -170,8 +170,8 @@ namespace OpdexGovernanceTests
 
             var existingCertificates = new[]
             {
-                new VaultCertificate {Amount = 100, VestedBlock = 500},
-                new VaultCertificate {Amount = 50, VestedBlock = 1500}
+                new VaultCertificate {Amount = 100, VestedBlock = 500, Revoked = false},
+                new VaultCertificate {Amount = 50, VestedBlock = 1500, Revoked = true}
             };
             
             var vault = CreateNewOpdexVault(block);
@@ -234,16 +234,16 @@ namespace OpdexGovernanceTests
 
             SetupMessage(Vault, Owner);
 
-            vault.CreateCertificate(Miner1, transferAmount);
+            vault.CreateCertificate(Miner, transferAmount);
 
-            var minerCertificates = vault.GetCertificates(Miner1);
+            var minerCertificates = vault.GetCertificates(Miner);
             minerCertificates.Single().Amount.Should().Be(transferAmount);
             minerCertificates.Single().VestedBlock.Should().Be(expectedVestedBlock);
             vault.TotalSupply.Should().Be(expectedTotalSupply);
             
             VerifyLog(new CreateVaultCertificateLog
             {
-                Owner = Miner1, 
+                Owner = Miner, 
                 Amount = transferAmount, 
                 VestedBlock = expectedVestedBlock
             }, Times.Once);
@@ -262,14 +262,14 @@ namespace OpdexGovernanceTests
             
             var vault = CreateNewOpdexVault(block);
             
-            PersistentState.SetArray($"Certificates:{Miner1}", existingMinerCertificates);
+            PersistentState.SetArray($"Certificates:{Miner}", existingMinerCertificates);
             PersistentState.SetUInt256(nameof(IOpdexVault.TotalSupply), currentTotalSupply);
 
             SetupMessage(Vault, Owner);
 
-            vault.CreateCertificate(Miner1, transferAmount);
+            vault.CreateCertificate(Miner, transferAmount);
 
-            var minerCertificates = vault.GetCertificates(Miner1);
+            var minerCertificates = vault.GetCertificates(Miner);
 
             minerCertificates.Length.Should().Be(2);
             minerCertificates[0].Amount.Should().Be((UInt256)100);
@@ -280,7 +280,7 @@ namespace OpdexGovernanceTests
 
             VerifyLog(new CreateVaultCertificateLog
             {
-                Owner = Miner1, 
+                Owner = Miner, 
                 Amount = transferAmount, 
                 VestedBlock = expectedVestedBlock
             }, Times.Once);
@@ -294,10 +294,10 @@ namespace OpdexGovernanceTests
             
             var vault = CreateNewOpdexVault(block);
             
-            SetupMessage(Vault, Miner1);
+            SetupMessage(Vault, Miner);
             
             vault
-                .Invoking(v => v.CreateCertificate(Miner1, transferAmount))
+                .Invoking(v => v.CreateCertificate(Miner, transferAmount))
                 .Should().Throw<SmartContractAssertException>()
                 .WithMessage("OPDEX: UNAUTHORIZED");
         }
@@ -332,7 +332,7 @@ namespace OpdexGovernanceTests
             SetupMessage(Vault, Owner);
             
             vault
-                .Invoking(v => v.CreateCertificate(Miner1, transferAmount))
+                .Invoking(v => v.CreateCertificate(Miner, transferAmount))
                 .Should().Throw<SmartContractAssertException>()
                 .WithMessage("OPDEX: INVALID_AMOUNT");
         }
@@ -350,7 +350,7 @@ namespace OpdexGovernanceTests
             SetupMessage(Vault, Owner);
             
             vault
-                .Invoking(v => v.CreateCertificate(Miner1, transferAmount))
+                .Invoking(v => v.CreateCertificate(Miner, transferAmount))
                 .Should().Throw<SmartContractAssertException>()
                 .WithMessage("OPDEX: TOKENS_BURNED");
         }
@@ -378,7 +378,7 @@ namespace OpdexGovernanceTests
         {
             var vault = CreateNewOpdexVault();
             
-            SetupMessage(Vault, Miner1);
+            SetupMessage(Vault, Miner);
 
             vault.Invoking(v => v.SetOwner(MiningGovernance))
                 .Should().Throw<SmartContractAssertException>()
@@ -398,16 +398,16 @@ namespace OpdexGovernanceTests
             
             var vault = CreateNewOpdexVault(block);
             
-            PersistentState.SetArray($"Certificates:{Miner1}", existingMinerCertificates);
+            PersistentState.SetArray($"Certificates:{Miner}", existingMinerCertificates);
             PersistentState.SetUInt256(nameof(IOpdexVault.TotalSupply), totalSupply);
             
             SetupMessage(Vault, Owner);
 
-            vault.RevokeCertificates(Miner1);
+            vault.RevokeCertificates(Miner);
             
             vault.TotalSupply.Should().Be(totalSupply + (currentAmount - expectedAmount));
 
-            var minerCertificates = vault.GetCertificates(Miner1);
+            var minerCertificates = vault.GetCertificates(Miner);
 
             minerCertificates.Single().Amount.Should().Be(expectedAmount);
             minerCertificates.Single().VestedBlock.Should().Be(vestedBlock);
@@ -415,7 +415,7 @@ namespace OpdexGovernanceTests
 
             VerifyLog(new RevokeVaultCertificateLog
             {
-                Owner = Miner1, 
+                Owner = Miner, 
                 OldAmount = currentAmount, 
                 NewAmount = expectedAmount, 
                 VestedBlock = vestedBlock
@@ -443,16 +443,16 @@ namespace OpdexGovernanceTests
             
             var vault = CreateNewOpdexVault(block);
             
-            PersistentState.SetArray($"Certificates:{Miner1}", existingMinerCertificates);
+            PersistentState.SetArray($"Certificates:{Miner}", existingMinerCertificates);
             PersistentState.SetUInt256(nameof(IOpdexVault.TotalSupply), currentTotalSupply);
             
             SetupMessage(Vault, Owner);
 
-            vault.RevokeCertificates(Miner1);
+            vault.RevokeCertificates(Miner);
 
             vault.TotalSupply.Should().Be(expectedTotalSupply);
 
-            var minerCertificates = vault.GetCertificates(Miner1);
+            var minerCertificates = vault.GetCertificates(Miner);
 
             minerCertificates.First().Amount.Should().Be(certOneExpectedAmount);
             minerCertificates.First().VestedBlock.Should().Be(certOneVestedBlock);
@@ -463,7 +463,7 @@ namespace OpdexGovernanceTests
 
             VerifyLog(new RevokeVaultCertificateLog
             {
-                Owner = Miner1, 
+                Owner = Miner, 
                 OldAmount = certOneCurrentAmount, 
                 NewAmount = certOneExpectedAmount, 
                 VestedBlock = certOneVestedBlock
@@ -471,7 +471,7 @@ namespace OpdexGovernanceTests
             
             VerifyLog(new RevokeVaultCertificateLog
             {
-                Owner = Miner1, 
+                Owner = Miner, 
                 OldAmount = certTwoCurrentAmount, 
                 NewAmount = certTwoExpectedAmount, 
                 VestedBlock = certTwoVestedBlock
@@ -493,16 +493,16 @@ namespace OpdexGovernanceTests
             
             var vault = CreateNewOpdexVault(block);
             
-            PersistentState.SetArray($"Certificates:{Miner1}", existingMinerCertificates);
+            PersistentState.SetArray($"Certificates:{Miner}", existingMinerCertificates);
             PersistentState.SetUInt256(nameof(IOpdexVault.TotalSupply), totalSupply);
 
             SetupMessage(Vault, Owner);
 
-            vault.RevokeCertificates(Miner1);
+            vault.RevokeCertificates(Miner);
 
             vault.TotalSupply.Should().Be(totalSupply);
 
-            var minerCertificates = vault.GetCertificates(Miner1);
+            var minerCertificates = vault.GetCertificates(Miner);
 
             minerCertificates.Single().Amount.Should().Be(certOneCurrentAmount);
             minerCertificates.Single().VestedBlock.Should().Be(certOneVestedBlock);
@@ -525,16 +525,16 @@ namespace OpdexGovernanceTests
             
             var vault = CreateNewOpdexVault(block);
             
-            PersistentState.SetArray($"Certificates:{Miner1}", existingMinerCertificates);
+            PersistentState.SetArray($"Certificates:{Miner}", existingMinerCertificates);
             PersistentState.SetUInt256(nameof(IOpdexVault.TotalSupply), totalSupply);
 
             SetupMessage(Vault, Owner);
 
-            vault.RevokeCertificates(Miner1);
+            vault.RevokeCertificates(Miner);
 
             vault.TotalSupply.Should().Be(totalSupply);
             
-            var minerCertificates = vault.GetCertificates(Miner1);
+            var minerCertificates = vault.GetCertificates(Miner);
 
             minerCertificates.Single().Amount.Should().Be(certOneCurrentAmount);
             minerCertificates.Single().VestedBlock.Should().Be(block);

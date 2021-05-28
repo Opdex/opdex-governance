@@ -13,7 +13,7 @@ public interface IOpdexMiningGovernance
     ulong NominationPeriodEnd { get; }
         
     /// <summary>
-    /// The amount of times mining pools have been funded.
+    /// The amount of times mining pools have been funded, resets at 48.
     /// </summary>
     uint MiningPoolsFunded { get; }
         
@@ -34,7 +34,7 @@ public interface IOpdexMiningGovernance
     bool Notified { get; }
         
     /// <summary>
-    /// The top staking pool nominations by weight.
+    /// The top 4 taking pool nominations by weight.
     /// </summary>
     Nomination[] Nominations { get; }
     

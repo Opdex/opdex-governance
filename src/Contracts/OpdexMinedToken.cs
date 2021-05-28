@@ -1,8 +1,8 @@
 ﻿using Stratis.SmartContracts;
 
 /// <summary>
-/// Mining token contract, used for staking in Opdex liquidity pools. Distributes to vault and mining governance
-/// based on a specified duration between distributions.
+/// Mined token contract distributed through a Vault and Mining Governance smart contract.
+/// Mined to use for governance voting though staking for liquidity mining. 
 /// </summary>
 [Deploy]
 public class OpdexMinedToken : SmartContract, IOpdexMinedToken
@@ -25,7 +25,6 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
         Symbol = "ODX";
         Decimals = 8;
         Creator = Message.Sender;
-        Genesis = Block.Number;
         VaultSchedule = vaultSchedule;
         MiningSchedule = miningSchedule;
         PeriodDuration = periodDuration;
@@ -157,7 +156,11 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
     public void Distribute(byte[] data)
     {
         var periodIndex = PeriodIndex;
-        if (periodIndex == 0) Assert(Message.Sender == Creator);
+        if (periodIndex == 0)
+        {
+            Assert(Message.Sender == Creator);
+            Genesis = Block.Number;
+        }
         
         var miningGov = MiningGovernance;
         var vault = Vault;

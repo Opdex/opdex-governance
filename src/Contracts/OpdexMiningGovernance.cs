@@ -20,8 +20,6 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
     {
         MinedToken = minedToken;
         MiningDuration = miningDuration;
-        NominationPeriodEnd = miningDuration / 4 + Block.Number;
-        Nominations = new Nomination[0];
     }
 
     /// <inheritdoc />
@@ -99,6 +97,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
 
         Notified = true;
         
+        // (First distribution only) - Sets initial nominations for mining
         if (data.Length > 0)
         {
             var stakingPools = Serializer.ToArray<Address>(data);
@@ -111,12 +110,14 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
             {
                 nominations[i] = new Nomination {StakingPool = stakingPools[i], Weight = 1};
             
-                Deploy(stakingPools[i]);
+                FindMiningPool(stakingPools[i]);
             }
 
             Nominations = nominations;
             
             SetMiningPoolRewardAmountExecute();
+            
+            NominationPeriodEnd = MiningDuration / 4 + Block.Number;
         }
 
         Unlock();
@@ -151,7 +152,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
         {
             StakingPool = nomination.StakingPool, 
             Weight = nomination.Weight, 
-            MiningPool = Deploy(nomination.StakingPool)
+            MiningPool = FindMiningPool(nomination.StakingPool)
         });
     }
 
@@ -217,7 +218,8 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
         
         SafeTransferTo(MinedToken, miningPool, reward);
 
-        Assert(Call(miningPool, 0, nameof(IOpdexMiningPool.NotifyRewardAmount), new object[] { reward }).Success);
+        // Don't verify success, funds have already been sent. Protects potential failures from locking nomination distribution
+        Call(miningPool, 0, "NotifyRewardAmount", new object[] {reward});
         
         Log(new RewardMiningPoolLog { StakingPool = nomination.StakingPool, MiningPool = miningPool, Amount = reward });
     }
@@ -249,17 +251,19 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
         Notified = false;
     }
     
-    private Address Deploy(Address stakingPool)
+    private Address FindMiningPool(Address stakingPool)
     {
         var miningPool = GetMiningPool(stakingPool);
 
         if (miningPool != Address.Zero) return miningPool;
 
-        miningPool = Create<OpdexMiningPool>(0ul, new object[] { Address, MinedToken, stakingPool, MiningDuration }).NewContractAddress;
+        var miningPoolResponse = Call(stakingPool, 0ul, "get_MiningPool");
+
+        miningPool = (Address)miningPoolResponse.ReturnValue;
+        
+        Assert(miningPoolResponse.Success && miningPool != Address.Zero, "OPDEX: INVALID_MINING_POOL");
         
         SetMiningPool(stakingPool, miningPool);
-        
-        Log(new CreateMiningPoolLog { MiningPool = miningPool, StakingPool = stakingPool });
 
         return miningPool;
     }
@@ -268,6 +272,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
     {
         var nominations = Nominations;
         
+        // Reset existing nominations to 1 weight, prevent lockup if no new nominations during RewardMiningPool(s)
         for (uint i = 0; i < nominations.Length; i++)
         {
             nominations[i].Weight = 1;
