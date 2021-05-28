@@ -97,6 +97,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
 
         Notified = true;
         
+        // (First distribution only) - Sets initial nominations for mining
         if (data.Length > 0)
         {
             var stakingPools = Serializer.ToArray<Address>(data);
@@ -146,14 +147,12 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
         }
 
         Nominations = nominations;
-
-        var miningPool = FindMiningPool(nomination.StakingPool);
         
         Log(new NominationLog
         {
             StakingPool = nomination.StakingPool, 
             Weight = nomination.Weight, 
-            MiningPool = miningPool
+            MiningPool = FindMiningPool(nomination.StakingPool)
         });
     }
 
@@ -219,7 +218,8 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
         
         SafeTransferTo(MinedToken, miningPool, reward);
 
-        Assert(Call(miningPool, 0, "NotifyRewardAmount", new object[] { reward }).Success);
+        // Don't verify success, funds have already been sent. Protects potential failures from locking nomination distribution
+        Call(miningPool, 0, "NotifyRewardAmount", new object[] {reward});
         
         Log(new RewardMiningPoolLog { StakingPool = nomination.StakingPool, MiningPool = miningPool, Amount = reward });
     }
@@ -257,7 +257,11 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
 
         if (miningPool != Address.Zero) return miningPool;
 
-        miningPool = (Address)Call(stakingPool, 0ul, "get_MiningPool").ReturnValue;
+        var miningPoolResponse = Call(stakingPool, 0ul, "get_MiningPool");
+
+        miningPool = (Address)miningPoolResponse.ReturnValue;
+        
+        Assert(miningPoolResponse.Success && miningPool != Address.Zero, "OPDEX: INVALID_MINING_POOL");
         
         SetMiningPool(stakingPool, miningPool);
 
@@ -268,6 +272,7 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
     {
         var nominations = Nominations;
         
+        // Reset existing nominations to 1 weight, prevent lockup if no new nominations during RewardMiningPool(s)
         for (uint i = 0; i < nominations.Length; i++)
         {
             nominations[i].Weight = 1;
