@@ -25,68 +25,68 @@ public class OpdexMiningGovernance : SmartContract, IOpdexMiningGovernance
     /// <inheritdoc />
     public Address MinedToken
     {
-        get => State.GetAddress(nameof(MinedToken));
-        private set => State.SetAddress(nameof(MinedToken), value);
+        get => State.GetAddress(GovernanceStateKeys.MinedToken);
+        private set => State.SetAddress(GovernanceStateKeys.MinedToken, value);
     }
 
     /// <inheritdoc />
     public bool Notified
     {
-        get => State.GetBool(nameof(Notified));
-        private set => State.SetBool(nameof(Notified), value);
+        get => State.GetBool(GovernanceStateKeys.Notified);
+        private set => State.SetBool(GovernanceStateKeys.Notified, value);
     }
 
     /// <inheritdoc />
     public Nomination[] Nominations
     {
-        get => State.GetArray<Nomination>(nameof(Nominations));
-        private set => State.SetArray(nameof(Nominations), value);
+        get => State.GetArray<Nomination>(GovernanceStateKeys.Nominations);
+        private set => State.SetArray(GovernanceStateKeys.Nominations, value);
     }
 
     /// <inheritdoc />
     public ulong MiningDuration
     {
-        get => State.GetUInt64(nameof(MiningDuration));
-        private set => State.SetUInt64(nameof(MiningDuration), value);
+        get => State.GetUInt64(GovernanceStateKeys.MiningDuration);
+        private set => State.SetUInt64(GovernanceStateKeys.MiningDuration, value);
     }
 
     /// <inheritdoc />
     public ulong NominationPeriodEnd
     {
-        get => State.GetUInt64(nameof(NominationPeriodEnd));
-        private set => State.SetUInt64(nameof(NominationPeriodEnd), value);
+        get => State.GetUInt64(GovernanceStateKeys.NominationPeriodEnd);
+        private set => State.SetUInt64(GovernanceStateKeys.NominationPeriodEnd, value);
     }
 
     /// <inheritdoc />
     public uint MiningPoolsFunded
     {
-        get => State.GetUInt32(nameof(MiningPoolsFunded));
-        private set => State.SetUInt32(nameof(MiningPoolsFunded), value);
+        get => State.GetUInt32(GovernanceStateKeys.MiningPoolsFunded);
+        private set => State.SetUInt32(GovernanceStateKeys.MiningPoolsFunded, value);
     }
 
     /// <inheritdoc />
     public UInt256 MiningPoolReward
     {
-        get => State.GetUInt256(nameof(MiningPoolReward));
-        private set => State.SetUInt256(nameof(MiningPoolReward), value);
+        get => State.GetUInt256(GovernanceStateKeys.MiningPoolReward);
+        private set => State.SetUInt256(GovernanceStateKeys.MiningPoolReward, value);
     }
 
     /// <inheritdoc />
     public bool Locked
     {
-        get => State.GetBool(nameof(Locked));
-        private set => State.SetBool(nameof(Locked), value);
+        get => State.GetBool(GovernanceStateKeys.Locked);
+        private set => State.SetBool(GovernanceStateKeys.Locked, value);
     }
 
     /// <inheritdoc />
     public Address GetMiningPool(Address stakingPool)
     {
-        return State.GetAddress($"MiningPool:{stakingPool}");
+        return State.GetAddress($"{GovernanceStateKeys.MiningPool}:{stakingPool}");
     }
 
     private void SetMiningPool(Address stakingPool, Address miningPool)
     {
-        State.SetAddress($"MiningPool:{stakingPool}", miningPool);
+        State.SetAddress($"{GovernanceStateKeys.MiningPool}:{stakingPool}", miningPool);
     }
 
     /// <inheritdoc />

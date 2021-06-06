@@ -35,107 +35,107 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
     /// <inheritdoc />
     public string Symbol
     {
-        get => State.GetString(nameof(Symbol));
-        private set => State.SetString(nameof(Symbol), value);
+        get => State.GetString(TokenStateKeys.Symbol);
+        private set => State.SetString(TokenStateKeys.Symbol, value);
     }
 
     /// <inheritdoc />
     public string Name
     {
-        get => State.GetString(nameof(Name));
-        private set => State.SetString(nameof(Name), value);
+        get => State.GetString(TokenStateKeys.Name);
+        private set => State.SetString(TokenStateKeys.Name, value);
     }
 
     /// <inheritdoc />
     public byte Decimals
     {
-        get => State.GetBytes(nameof(Decimals))[0];
-        private set => State.SetBytes(nameof(Decimals), new [] {value});
+        get => State.GetBytes(TokenStateKeys.Decimals)[0];
+        private set => State.SetBytes(TokenStateKeys.Decimals, new [] {value});
     }
 
     /// <inheritdoc />
     public UInt256 TotalSupply
     {
-        get => State.GetUInt256(nameof(TotalSupply));
-        private set => State.SetUInt256(nameof(TotalSupply), value);
+        get => State.GetUInt256(TokenStateKeys.TotalSupply);
+        private set => State.SetUInt256(TokenStateKeys.TotalSupply, value);
     }
 
     /// <inheritdoc />
     public Address Creator
     {
-        get => State.GetAddress(nameof(Creator));
-        private set => State.SetAddress(nameof(Creator), value);
+        get => State.GetAddress(TokenStateKeys.Creator);
+        private set => State.SetAddress(TokenStateKeys.Creator, value);
     }
 
     /// <inheritdoc />
     public Address MiningGovernance
     {
-        get => State.GetAddress(nameof(MiningGovernance));
-        private set => State.SetAddress(nameof(MiningGovernance), value);
+        get => State.GetAddress(TokenStateKeys.MiningGovernance);
+        private set => State.SetAddress(TokenStateKeys.MiningGovernance, value);
     }
 
     /// <inheritdoc />
     public Address Vault
     {
-        get => State.GetAddress(nameof(Vault));
-        private set => State.SetAddress(nameof(Vault), value);
+        get => State.GetAddress(TokenStateKeys.Vault);
+        private set => State.SetAddress(TokenStateKeys.Vault, value);
     }
 
     /// <inheritdoc />
     public UInt256[] VaultSchedule
     {
-        get => State.GetArray<UInt256>(nameof(VaultSchedule));
-        private set => State.SetArray(nameof(VaultSchedule), value);
+        get => State.GetArray<UInt256>(TokenStateKeys.VaultSchedule);
+        private set => State.SetArray(TokenStateKeys.VaultSchedule, value);
     }
 
     /// <inheritdoc />
     public UInt256[] MiningSchedule
     {
-        get => State.GetArray<UInt256>(nameof(MiningSchedule));
-        private set => State.SetArray(nameof(MiningSchedule), value);
+        get => State.GetArray<UInt256>(TokenStateKeys.MiningSchedule);
+        private set => State.SetArray(TokenStateKeys.MiningSchedule, value);
     }
 
     /// <inheritdoc />
     public ulong Genesis
     {
-        get => State.GetUInt64(nameof(Genesis));
-        private set => State.SetUInt64(nameof(Genesis), value);
+        get => State.GetUInt64(TokenStateKeys.Genesis);
+        private set => State.SetUInt64(TokenStateKeys.Genesis, value);
     }
 
     /// <inheritdoc />
     public uint PeriodIndex
     {
-        get => State.GetUInt32(nameof(PeriodIndex));
-        private set => State.SetUInt32(nameof(PeriodIndex), value);
+        get => State.GetUInt32(TokenStateKeys.PeriodIndex);
+        private set => State.SetUInt32(TokenStateKeys.PeriodIndex, value);
     }
 
     /// <inheritdoc />
     public ulong PeriodDuration
     {
-        get => State.GetUInt64(nameof(PeriodDuration));
-        private set => State.SetUInt64(nameof(PeriodDuration), value);
+        get => State.GetUInt64(TokenStateKeys.PeriodDuration);
+        private set => State.SetUInt64(TokenStateKeys.PeriodDuration, value);
     }
 
     /// <inheritdoc />
     public UInt256 GetBalance(Address address)
     {
-        return State.GetUInt256($"Balance:{address}");
+        return State.GetUInt256($"{TokenStateKeys.Balance}:{address}");
     }
 
     private void SetBalance(Address address, UInt256 value)
     {
-        State.SetUInt256($"Balance:{address}", value);
+        State.SetUInt256($"{TokenStateKeys.Balance}:{address}", value);
     }
 
     private void SetApproval(Address owner, Address spender, UInt256 value)
     {
-        State.SetUInt256($"Allowance:{owner}:{spender}", value);
+        State.SetUInt256($"{TokenStateKeys.Allowance}:{owner}:{spender}", value);
     }
 
     /// <inheritdoc />
     public UInt256 Allowance(Address owner, Address spender)
     {
-        return State.GetUInt256($"Allowance:{owner}:{spender}");
+        return State.GetUInt256($"{TokenStateKeys.Allowance}:{owner}:{spender}");
     }
 
     /// <inheritdoc />
@@ -283,7 +283,7 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
 
         var miningGovernanceResponse = Create<OpdexMiningGovernance>(0, new object[] {Address, miningDuration});
 
-        Assert(miningGovernanceResponse.Success && miningGovernanceResponse.NewContractAddress != Address.Zero, "OPDEX: INVALID_MINING_GOVERNANCE_ADDRESS");
+        Assert(miningGovernanceResponse.Success, "OPDEX: INVALID_MINING_GOVERNANCE_ADDRESS");
 
         return miningGovernanceResponse.NewContractAddress;
     }
@@ -294,7 +294,7 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
 
         var vaultResponse = Create<OpdexVault>(0, new object[] {Address, Message.Sender, vestingPeriod});
 
-        Assert(vaultResponse.Success && vaultResponse.NewContractAddress != Address.Zero, "OPDEX: INVALID_VAULT_ADDRESS");
+        Assert(vaultResponse.Success, "OPDEX: INVALID_VAULT_ADDRESS");
 
         return vaultResponse.NewContractAddress;
     }

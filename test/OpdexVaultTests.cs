@@ -30,7 +30,7 @@ namespace OpdexGovernanceTests
         {
             var vault = CreateNewOpdexVault();
 
-            State.SetUInt256(nameof(IOpdexVault.TotalSupply), currentTotalSupply);
+            State.SetUInt256(VaultStateKeys.TotalSupply, currentTotalSupply);
 
             SetupMessage(Vault, ODX);
 
@@ -97,7 +97,7 @@ namespace OpdexGovernanceTests
 
             var vault = CreateNewOpdexVault(block);
 
-            State.SetUInt256(nameof(IOpdexVault.TotalSupply), currentTotalSupply);
+            State.SetUInt256(VaultStateKeys.TotalSupply, currentTotalSupply);
 
             SetupMessage(Vault, Owner);
 
@@ -130,8 +130,8 @@ namespace OpdexGovernanceTests
 
             var vault = CreateNewOpdexVault(block);
 
-            State.SetArray($"Certificates:{Miner}", existingMinerCertificates);
-            State.SetUInt256(nameof(IOpdexVault.TotalSupply), currentTotalSupply);
+            State.SetArray($"{VaultStateKeys.Certificates}:{Miner}", existingMinerCertificates);
+            State.SetUInt256(VaultStateKeys.TotalSupply, currentTotalSupply);
 
             SetupMessage(Vault, Owner);
 
@@ -195,7 +195,7 @@ namespace OpdexGovernanceTests
 
             var vault = CreateNewOpdexVault(block);
 
-            State.SetUInt256(nameof(IOpdexVault.TotalSupply), currentTotalSupply);
+            State.SetUInt256(VaultStateKeys.TotalSupply, currentTotalSupply);
 
             SetupMessage(Vault, Owner);
 
@@ -213,7 +213,7 @@ namespace OpdexGovernanceTests
 
             var vault = CreateNewOpdexVault(block);
 
-            State.SetUInt256(nameof(IOpdexVault.TotalSupply), UInt256.MaxValue);
+            State.SetUInt256(VaultStateKeys.TotalSupply, UInt256.MaxValue);
 
             SetupMessage(Vault, Owner);
 
@@ -234,8 +234,8 @@ namespace OpdexGovernanceTests
 
             var vault = CreateNewOpdexVault(block);
 
-            State.SetArray($"Certificates:{Miner}", existingMinerCertificates);
-            State.SetUInt256(nameof(IOpdexVault.TotalSupply), currentTotalSupply);
+            State.SetArray($"{VaultStateKeys.Certificates}:{Miner}", existingMinerCertificates);
+            State.SetUInt256(VaultStateKeys.TotalSupply, currentTotalSupply);
 
             SetupMessage(Vault, Owner);
 
@@ -255,7 +255,7 @@ namespace OpdexGovernanceTests
         {
             var vault = CreateNewOpdexVault();
 
-            State.SetArray($"Certificates:{Miner}", new VaultCertificate[0]);
+            State.SetArray($"{VaultStateKeys.Certificates}:{Miner}", new VaultCertificate[0]);
 
             SetupMessage(Vault, Miner);
 
@@ -276,7 +276,7 @@ namespace OpdexGovernanceTests
 
             var vault = CreateNewOpdexVault(block);
 
-            State.SetArray($"Certificates:{Miner}", new[] { existingCertificate });
+            State.SetArray($"{VaultStateKeys.Certificates}:{Miner}", new[] { existingCertificate });
 
             SetupMessage(Vault, Miner);
 
@@ -300,7 +300,7 @@ namespace OpdexGovernanceTests
 
             var vault = CreateNewOpdexVault(block);
 
-            State.SetArray($"Certificates:{Miner}", new[] { existingCertificate });
+            State.SetArray($"{VaultStateKeys.Certificates}:{Miner}", new[] { existingCertificate });
 
             SetupMessage(Vault, Miner);
 
@@ -334,7 +334,7 @@ namespace OpdexGovernanceTests
 
             var vault = CreateNewOpdexVault(block);
 
-            State.SetArray($"Certificates:{Miner}", existingCertificates);
+            State.SetArray($"{VaultStateKeys.Certificates}:{Miner}", existingCertificates);
 
             SetupMessage(Vault, Miner);
 
@@ -372,7 +372,7 @@ namespace OpdexGovernanceTests
 
             var vault = CreateNewOpdexVault(block);
 
-            State.SetArray($"Certificates:{Miner}", existingCertificates);
+            State.SetArray($"{VaultStateKeys.Certificates}:{Miner}", existingCertificates);
 
             SetupMessage(Vault, Miner);
 
@@ -398,7 +398,7 @@ namespace OpdexGovernanceTests
 
             var vault = CreateNewOpdexVault(block);
 
-            State.SetArray($"Certificates:{Miner}", existingCertificates);
+            State.SetArray($"{VaultStateKeys.Certificates}:{Miner}", existingCertificates);
 
             SetupMessage(Vault, Miner);
 
@@ -433,8 +433,8 @@ namespace OpdexGovernanceTests
 
             var vault = CreateNewOpdexVault(block);
 
-            State.SetArray($"Certificates:{Miner}", existingMinerCertificates);
-            State.SetUInt256(nameof(IOpdexVault.TotalSupply), totalSupply);
+            State.SetArray($"{VaultStateKeys.Certificates}:{Miner}", existingMinerCertificates);
+            State.SetUInt256(VaultStateKeys.TotalSupply, totalSupply);
 
             SetupMessage(Vault, Owner);
 
@@ -478,8 +478,8 @@ namespace OpdexGovernanceTests
 
             var vault = CreateNewOpdexVault(block);
 
-            State.SetArray($"Certificates:{Miner}", existingMinerCertificates);
-            State.SetUInt256(nameof(IOpdexVault.TotalSupply), currentTotalSupply);
+            State.SetArray($"{VaultStateKeys.Certificates}:{Miner}", existingMinerCertificates);
+            State.SetUInt256(VaultStateKeys.TotalSupply, currentTotalSupply);
 
             SetupMessage(Vault, Owner);
 
@@ -528,8 +528,8 @@ namespace OpdexGovernanceTests
 
             var vault = CreateNewOpdexVault(block);
 
-            State.SetArray($"Certificates:{Miner}", existingMinerCertificates);
-            State.SetUInt256(nameof(IOpdexVault.TotalSupply), totalSupply);
+            State.SetArray($"{VaultStateKeys.Certificates}:{Miner}", existingMinerCertificates);
+            State.SetUInt256(VaultStateKeys.TotalSupply, totalSupply);
 
             SetupMessage(Vault, Owner);
 
@@ -560,8 +560,8 @@ namespace OpdexGovernanceTests
 
             var vault = CreateNewOpdexVault(block);
 
-            State.SetArray($"Certificates:{Miner}", existingMinerCertificates);
-            State.SetUInt256(nameof(IOpdexVault.TotalSupply), totalSupply);
+            State.SetArray($"{VaultStateKeys.Certificates}:{Miner}", existingMinerCertificates);
+            State.SetUInt256(VaultStateKeys.TotalSupply, totalSupply);
 
             SetupMessage(Vault, Owner);
 

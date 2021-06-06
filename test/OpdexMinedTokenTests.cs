@@ -135,7 +135,7 @@ namespace OpdexGovernanceTests
         {
             var token = CreateNewOpdexToken(Serializer.Serialize(DefaultVaultSchedule), Serializer.Serialize(DefaultMiningSchedule));
 
-            State.SetUInt32(nameof(IOpdexMinedToken.PeriodIndex), 1);
+            State.SetUInt32(TokenStateKeys.PeriodIndex, 1);
 
             token
                 .Invoking(t => t.DistributeGenesis(Pool1, Pool2, Pool3, Pool4))
@@ -190,12 +190,12 @@ namespace OpdexGovernanceTests
 
             var token = CreateNewOpdexToken(Serializer.Serialize(DefaultVaultSchedule), Serializer.Serialize(DefaultMiningSchedule), genesis);
 
-            State.SetUInt256($"Balance:{Vault}", currentVaultBalance);
-            State.SetUInt256($"Balance:{MiningGovernance}", currentMiningBalance);
-            State.SetUInt32(nameof(IOpdexMinedToken.PeriodIndex), periodIndex);
-            State.SetUInt64(nameof(IOpdexMinedToken.PeriodDuration), periodDuration);
-            State.SetUInt256(nameof(IOpdexMinedToken.TotalSupply), currentTotalSupply);
-            State.SetUInt64(nameof(IOpdexMinedToken.Genesis), genesis);
+            State.SetUInt256($"{TokenStateKeys.Balance}:{Vault}", currentVaultBalance);
+            State.SetUInt256($"{TokenStateKeys.Balance}:{MiningGovernance}", currentMiningBalance);
+            State.SetUInt32(TokenStateKeys.PeriodIndex, periodIndex);
+            State.SetUInt64(TokenStateKeys.PeriodDuration, periodDuration);
+            State.SetUInt256(TokenStateKeys.TotalSupply, currentTotalSupply);
+            State.SetUInt64(TokenStateKeys.Genesis, genesis);
 
             var block = (BlocksPerYear * periodIndex) + genesis;
             SetupBlock(block);
@@ -248,7 +248,7 @@ namespace OpdexGovernanceTests
             var token = CreateNewOpdexToken(Serializer.Serialize(DefaultVaultSchedule), Serializer.Serialize(DefaultMiningSchedule), genesis);
 
             State.SetAddress(nameof(MiningGovernance), MiningGovernance);
-            State.SetUInt32(nameof(IOpdexMinedToken.PeriodIndex), periodIndex);
+            State.SetUInt32(TokenStateKeys.PeriodIndex, periodIndex);
 
             SetupBlock(genesis);
 
@@ -308,7 +308,7 @@ namespace OpdexGovernanceTests
         {
             var token = CreateNewOpdexToken(Serializer.Serialize(DefaultVaultSchedule), Serializer.Serialize(DefaultMiningSchedule));
 
-            State.SetUInt32(nameof(IOpdexMinedToken.PeriodIndex), 0);
+            State.SetUInt32(TokenStateKeys.PeriodIndex, 0);
 
             token
                 .Invoking(t => t.Distribute())
@@ -332,7 +332,7 @@ namespace OpdexGovernanceTests
             SetupMessage(MiningGovernance, Pool1);
 
             State.SetContract(Pool1, true);
-            State.SetUInt256($"Balance:{Pool1}", weight);
+            State.SetUInt256($"{TokenStateKeys.Balance}:{Pool1}", weight);
 
             var notifyParams = new object[] {Pool1, weight};
 
@@ -366,7 +366,7 @@ namespace OpdexGovernanceTests
             SetupMessage(MiningGovernance, Pool1);
 
             State.SetContract(Pool1, true);
-            State.SetUInt256($"Balance:{Pool1}", UInt256.Zero);
+            State.SetUInt256($"{TokenStateKeys.Balance}:{Pool1}", UInt256.Zero);
 
             var notifyParams = new object[] {Pool1, UInt256.Zero};
 
@@ -386,7 +386,7 @@ namespace OpdexGovernanceTests
             SetupMessage(MiningGovernance, Pool1);
 
             State.SetContract(Pool1, true);
-            State.SetUInt256($"Balance:{Pool1}", weight);
+            State.SetUInt256($"{TokenStateKeys.Balance}:{Pool1}", weight);
 
             var notifyParams = new object[] {Pool1, weight};
             SetupCall(MiningGovernance, 0ul, nameof(IOpdexMiningGovernance.NominateLiquidityPool), notifyParams, TransferResult.Failed());
@@ -413,8 +413,8 @@ namespace OpdexGovernanceTests
 
             SetupMessage(ODX, spender);
 
-            State.SetUInt256($"Balance:{owner}", ownerBalance);
-            State.SetUInt256($"Allowance:{owner}:{spender}", spenderAllowance);
+            State.SetUInt256($"{TokenStateKeys.Balance}:{owner}", ownerBalance);
+            State.SetUInt256($"{TokenStateKeys.Allowance}:{owner}:{spender}", spenderAllowance);
 
             token.TransferFrom(owner, recipient, spenderAllowance).Should().BeTrue();
             token.GetBalance(owner).Should().Be(ownerBalance - spenderAllowance);
@@ -437,8 +437,8 @@ namespace OpdexGovernanceTests
 
             SetupMessage(ODX, spender);
 
-            State.SetUInt256($"Balance:{owner}", ownerBalance);
-            State.SetUInt256($"Allowance:{owner}:{spender}", spenderAllowance);
+            State.SetUInt256($"{TokenStateKeys.Balance}:{owner}", ownerBalance);
+            State.SetUInt256($"{TokenStateKeys.Allowance}:{owner}:{spender}", spenderAllowance);
 
             token.TransferFrom(owner, recipient, spenderAttempt).Should().BeFalse();
             token.GetBalance(owner).Should().Be(ownerBalance);
@@ -460,8 +460,8 @@ namespace OpdexGovernanceTests
 
             SetupMessage(ODX, spender);
 
-            State.SetUInt256($"Balance:{owner}", ownerBalance);
-            State.SetUInt256($"Allowance:{owner}:{spender}", spenderAllowance);
+            State.SetUInt256($"{TokenStateKeys.Balance}:{owner}", ownerBalance);
+            State.SetUInt256($"{TokenStateKeys.Allowance}:{owner}:{spender}", spenderAllowance);
 
             token.TransferFrom(owner, recipient, spenderAllowance).Should().BeFalse();
             token.GetBalance(owner).Should().Be(ownerBalance);
@@ -484,8 +484,8 @@ namespace OpdexGovernanceTests
 
             SetupMessage(ODX, Owner);
 
-            State.SetUInt256($"Balance:{Owner}", ownerBalance);
-            State.SetUInt256($"Balance:{Miner}", existingMinerBalance);
+            State.SetUInt256($"{TokenStateKeys.Balance}:{Owner}", ownerBalance);
+            State.SetUInt256($"{TokenStateKeys.Balance}:{Miner}", existingMinerBalance);
 
             token.TransferTo(Miner, transferAmount).Should().BeTrue();
             token.GetBalance(Owner).Should().Be(ownerBalance - transferAmount);
@@ -504,7 +504,7 @@ namespace OpdexGovernanceTests
 
             SetupMessage(ODX, Owner);
 
-            State.SetUInt256($"Balance:{Owner}", ownerBalance);
+            State.SetUInt256($"{TokenStateKeys.Balance}:{Owner}", ownerBalance);
 
             token.TransferTo(Owner, transferAmount).Should().BeFalse();
             token.GetBalance(Owner).Should().Be(ownerBalance);
@@ -529,8 +529,8 @@ namespace OpdexGovernanceTests
 
             SetupMessage(ODX, owner);
 
-            State.SetUInt256($"Balance:{owner}", ownerBalance);
-            State.SetUInt256($"Allowance:{owner}:{spender}", currentAmount);
+            State.SetUInt256($"{TokenStateKeys.Balance}:{owner}", ownerBalance);
+            State.SetUInt256($"{TokenStateKeys.Allowance}:{owner}:{spender}", currentAmount);
 
             token.Approve(spender, currentAmount, amount).Should().BeTrue();
             token.Allowance(owner, spender).Should().Be(amount);
@@ -551,8 +551,8 @@ namespace OpdexGovernanceTests
 
             SetupMessage(ODX, owner);
 
-            State.SetUInt256($"Balance:{owner}", ownerBalance);
-            State.SetUInt256($"Allowance:{owner}:{spender}", 0);
+            State.SetUInt256($"{TokenStateKeys.Balance}:{owner}", ownerBalance);
+            State.SetUInt256($"{TokenStateKeys.Allowance}:{owner}:{spender}", 0);
 
             token.Approve(spender, currentAmount, amount).Should().BeFalse();
             token.Allowance(owner, spender).Should().Be(UInt256.Zero);

@@ -25,47 +25,47 @@ public class OpdexVault : SmartContract, IOpdexVault
     /// <inheritdoc />
     public ulong Genesis
     {
-        get => State.GetUInt64(nameof(Genesis));
-        private set => State.SetUInt64(nameof(Genesis), value);
+        get => State.GetUInt64(VaultStateKeys.Genesis);
+        private set => State.SetUInt64(VaultStateKeys.Genesis, value);
     }
 
     /// <inheritdoc />
     public ulong VestingDuration
     {
-        get => State.GetUInt64(nameof(VestingDuration));
-        private set => State.SetUInt64(nameof(VestingDuration), value);
+        get => State.GetUInt64(VaultStateKeys.VestingDuration);
+        private set => State.SetUInt64(VaultStateKeys.VestingDuration, value);
     }
 
     /// <inheritdoc />
     public Address Token
     {
-        get => State.GetAddress(nameof(Token));
-        private set => State.SetAddress(nameof(Token), value);
+        get => State.GetAddress(VaultStateKeys.Token);
+        private set => State.SetAddress(VaultStateKeys.Token, value);
     }
 
     /// <inheritdoc />
     public Address Owner
     {
-        get => State.GetAddress(nameof(Owner));
-        private set => State.SetAddress(nameof(Owner), value);
+        get => State.GetAddress(VaultStateKeys.Owner);
+        private set => State.SetAddress(VaultStateKeys.Owner, value);
     }
 
     /// <inheritdoc />
     public UInt256 TotalSupply
     {
-        get => State.GetUInt256(nameof(TotalSupply));
-        private set => State.SetUInt256(nameof(TotalSupply), value);
+        get => State.GetUInt256(VaultStateKeys.TotalSupply);
+        private set => State.SetUInt256(VaultStateKeys.TotalSupply, value);
     }
 
     /// <inheritdoc />
     public VaultCertificate[] GetCertificates(Address wallet)
     {
-        return State.GetArray<VaultCertificate>($"Certificates:{wallet}") ?? new VaultCertificate[0];
+        return State.GetArray<VaultCertificate>($"{VaultStateKeys.Certificates}:{wallet}") ?? new VaultCertificate[0];
     }
 
     private void SetCertificates(Address wallet, VaultCertificate[] certificates)
     {
-        State.SetArray($"Certificates:{wallet}", certificates);
+        State.SetArray($"{VaultStateKeys.Certificates}:{wallet}", certificates);
     }
 
     /// <inheritdoc />
