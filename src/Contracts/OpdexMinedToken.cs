@@ -1,8 +1,8 @@
 ﻿using Stratis.SmartContracts;
 
 /// <summary>
-/// Mined token contract distributed through a Vault and Mining Governance smart contract.
-/// Mined to use for governance voting though staking for liquidity mining. 
+/// Mined token contract distributed through a Mining Governance and Vault smart contract.
+/// Used for staking in Opdex liquidity pools to participate in governance for liquidity mining pool selection.
 /// </summary>
 [Deploy]
 public class OpdexMinedToken : SmartContract, IOpdexMinedToken
@@ -19,7 +19,7 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
         var vaultSchedule = Serializer.ToArray<UInt256>(vaultDistribution);
         var miningSchedule = Serializer.ToArray<UInt256>(miningDistribution);
 
-        Assert(vaultSchedule.Length > 1 && vaultSchedule.Length == miningSchedule.Length);
+        Assert(vaultSchedule.Length > 1 && vaultSchedule.Length == miningSchedule.Length, "OPDEX: INVALID_DISTRIBUTION_SCHEDULE");
 
         Name = "Opdex";
         Symbol = "ODX";
@@ -28,12 +28,10 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
         VaultSchedule = vaultSchedule;
         MiningSchedule = miningSchedule;
         PeriodDuration = periodDuration;
-        
-        var miningDuration = periodDuration / 12;
-        MiningGovernance = Create<OpdexMiningGovernance>(0, new object[] {Address, miningDuration}).NewContractAddress;
-        Vault = Create<OpdexVault>(0, new object[] {Address, Message.Sender, periodDuration}).NewContractAddress;
+        MiningGovernance = InitializeMiningGovernance(periodDuration);
+        Vault = InitializeVault(periodDuration);
     }
-    
+
     /// <inheritdoc />
     public string Symbol
     {
@@ -54,7 +52,7 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
         get => State.GetBytes(nameof(Decimals))[0];
         private set => State.SetBytes(nameof(Decimals), new [] {value});
     }
-    
+
     /// <inheritdoc />
     public UInt256 TotalSupply
     {
@@ -68,21 +66,21 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
         get => State.GetAddress(nameof(Creator));
         private set => State.SetAddress(nameof(Creator), value);
     }
-    
+
     /// <inheritdoc />
     public Address MiningGovernance
     {
         get => State.GetAddress(nameof(MiningGovernance));
         private set => State.SetAddress(nameof(MiningGovernance), value);
     }
-    
+
     /// <inheritdoc />
     public Address Vault
     {
         get => State.GetAddress(nameof(Vault));
         private set => State.SetAddress(nameof(Vault), value);
     }
-    
+
     /// <inheritdoc />
     public UInt256[] VaultSchedule
     {
@@ -103,14 +101,14 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
         get => State.GetUInt64(nameof(Genesis));
         private set => State.SetUInt64(nameof(Genesis), value);
     }
-    
+
     /// <inheritdoc />
     public uint PeriodIndex
     {
         get => State.GetUInt32(nameof(PeriodIndex));
         private set => State.SetUInt32(nameof(PeriodIndex), value);
     }
-    
+
     /// <inheritdoc />
     public ulong PeriodDuration
     {
@@ -139,7 +137,7 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
     {
         return State.GetUInt256($"Allowance:{owner}:{spender}");
     }
-    
+
     /// <inheritdoc />
     public void NominateLiquidityPool()
     {
@@ -148,65 +146,40 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
         var balance = GetBalance(Message.Sender);
 
         if (balance == 0) return;
-        
+
+        // Intentionally ignore the response
         Call(MiningGovernance, 0ul, nameof(NominateLiquidityPool), new object[] {Message.Sender, balance});
     }
-    
+
     /// <inheritdoc />
-    public void Distribute(byte[] data)
+    public void DistributeGenesis(Address firstNomination, Address secondNomination, Address thirdNomination, Address fourthNomination)
     {
         var periodIndex = PeriodIndex;
-        if (periodIndex == 0)
-        {
-            Assert(Message.Sender == Creator);
-            Genesis = Block.Number;
-        }
-        
-        var miningGov = MiningGovernance;
-        var vault = Vault;
-        var miningSchedule = MiningSchedule;
-        var vaultSchedule = VaultSchedule;
-        var inflationIndex = (uint)vaultSchedule.Length - 1;
-        var minBlock = periodIndex == 0 ? Genesis : PeriodDuration * periodIndex + Genesis;
-        
-        Assert(Block.Number >= minBlock, "OPDEX: DISTRIBUTION_NOT_READY");
+        Assert(periodIndex == 0, "OPDEX: INVALID_DISTRIBUTION_PERIOD");
+        Assert(Message.Sender == Creator, "OPDEX: UNAUTHORIZED");
 
-        var scheduleIndex = periodIndex < inflationIndex ? periodIndex : inflationIndex;
-        var miningTokens = miningSchedule[scheduleIndex];
-        var vaultTokens = vaultSchedule[scheduleIndex];
-        var supplyIncrease = miningTokens + vaultTokens;
-        
-        if (miningTokens > 0)
-        {
-            SetBalance(miningGov, GetBalance(miningGov) + miningTokens);
+        var nominations = new [] {firstNomination, secondNomination, thirdNomination, fourthNomination};
 
-            data = periodIndex == 0 ? data : new byte[0];
-            
-            var governanceNotification = Call(miningGov, 0ul, nameof(IOpdexMiningGovernance.NotifyDistribution), new object[] {data});
-            
-            Assert(governanceNotification.Success, "OPDEX: FAILED_GOVERNANCE_DISTRIBUTION");
-        }
-        
-        if (vaultTokens > 0)
+        foreach (var nomination in nominations)
         {
-            SetBalance(vault, GetBalance(vault) + vaultTokens);
-            
-            var vaultNotification = Call(vault, 0, nameof(IOpdexVault.NotifyDistribution), new object[] { vaultTokens });
-            
-            Assert(vaultNotification.Success, "OPDEX: FAILED_VAULT_DISTRIBUTION");
+            Assert(nomination != Address.Zero && State.IsContract(nomination), "OPDEX: INVALID_NOMINATION");
         }
 
-        TotalSupply += supplyIncrease;
-        PeriodIndex++;
-        
-        Log(new DistributionLog
-        {
-            MiningAmount = miningTokens,
-            VaultAmount = vaultTokens,
-            PeriodIndex = periodIndex
-        });
+        Genesis = Block.Number;
+
+        DistributeExecute(periodIndex, nominations);
     }
-    
+
+    /// <inheritdoc />
+    public void Distribute()
+    {
+        var periodIndex = PeriodIndex;
+        Assert(periodIndex > 0, "OPDEX: INVALID_DISTRIBUTION_PERIOD");
+
+        // 4 Addresses to send
+        DistributeExecute(periodIndex, new Address[4]);
+    }
+
     /// <inheritdoc />
     public bool TransferTo(Address to, UInt256 amount)
     {
@@ -261,5 +234,68 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
         Log(new ApprovalLog { Owner = Message.Sender, Spender = spender, Amount = amount, OldAmount = currentAmount });
 
         return true;
+    }
+
+    private void DistributeExecute(uint periodIndex, Address[] nominations)
+    {
+        var minBlock = periodIndex == 0 ? Genesis : PeriodDuration * periodIndex + Genesis;
+
+        Assert(Block.Number >= minBlock, "OPDEX: DISTRIBUTION_NOT_READY");
+
+        var miningGov = MiningGovernance;
+        var vault = Vault;
+        var miningSchedule = MiningSchedule;
+        var vaultSchedule = VaultSchedule;
+        var inflationIndex = (uint)vaultSchedule.Length - 1;
+        var scheduleIndex = periodIndex < inflationIndex ? periodIndex : inflationIndex;
+        var miningTokens = miningSchedule[scheduleIndex];
+        var vaultTokens = vaultSchedule[scheduleIndex];
+        var supplyIncrease = miningTokens + vaultTokens;
+
+        if (miningTokens > 0)
+        {
+            SetBalance(miningGov, GetBalance(miningGov) + miningTokens);
+
+            var nominationParams = new object[] {nominations[0], nominations[1], nominations[2], nominations[3]};
+            var governanceNotification = Call(miningGov, 0ul, nameof(IOpdexMiningGovernance.NotifyDistribution), nominationParams);
+
+            Assert(governanceNotification.Success, "OPDEX: FAILED_GOVERNANCE_DISTRIBUTION");
+        }
+
+        if (vaultTokens > 0)
+        {
+            SetBalance(vault, GetBalance(vault) + vaultTokens);
+
+            var vaultNotification = Call(vault, 0, nameof(IOpdexVault.NotifyDistribution), new object[] { vaultTokens });
+
+            Assert(vaultNotification.Success, "OPDEX: FAILED_VAULT_DISTRIBUTION");
+        }
+
+        TotalSupply += supplyIncrease;
+        PeriodIndex++;
+
+        Log(new DistributionLog { MiningAmount = miningTokens, VaultAmount = vaultTokens, PeriodIndex = periodIndex });
+    }
+
+    private Address InitializeMiningGovernance(ulong periodDuration)
+    {
+        var miningDuration = periodDuration / 12;
+
+        var miningGovernanceResponse = Create<OpdexMiningGovernance>(0, new object[] {Address, miningDuration});
+
+        Assert(miningGovernanceResponse.Success && miningGovernanceResponse.NewContractAddress != Address.Zero, "OPDEX: INVALID_MINING_GOVERNANCE_ADDRESS");
+
+        return miningGovernanceResponse.NewContractAddress;
+    }
+
+    private Address InitializeVault(ulong periodDuration)
+    {
+        var vestingPeriod = periodDuration * 4;
+
+        var vaultResponse = Create<OpdexVault>(0, new object[] {Address, Message.Sender, vestingPeriod});
+
+        Assert(vaultResponse.Success && vaultResponse.NewContractAddress != Address.Zero, "OPDEX: INVALID_VAULT_ADDRESS");
+
+        return vaultResponse.NewContractAddress;
     }
 }

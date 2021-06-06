@@ -40,22 +40,23 @@ namespace OpdexGovernanceTests
         {
             const ulong genesis = 100;
             var gov = CreateNewOpdexMiningGovernance(genesis);
-            
-            PersistentState.SetAddress($"MiningPool:{ODX}", Miner);
+
+            State.SetAddress($"MiningPool:{ODX}", Miner);
 
             gov.GetMiningPool(ODX).Should().Be(Miner);
         }
-        
+
         #region Notify Distribution Tests
 
         [Fact]
         public void NotifyDistribution_SetStakingTokens_Success()
         {
             // Arrange
-            UInt256 expectedBalance = 28_000_000_000_000_000; // 280 million
-            UInt256 expectedMiningPoolReward = 583_333_333_333_333; // 5,8333,333 million
+            const ulong block = 100;
+            UInt256 expectedBalance = 30_000_000_000_000_000; // 300 million
+            UInt256 expectedMiningPoolReward = 625_000_000_000_000; // 6,250,000 million
             var pools = new[] { Pool1, Pool2, Pool3, Pool4 };
-            var gov = CreateNewOpdexMiningGovernance();
+            var gov = CreateNewOpdexMiningGovernance(block);
 
             var getBalanceParams = new object[] {MiningGovernance};
             SetupCall(ODX, 0ul, nameof(IOpdexMinedToken.GetBalance), getBalanceParams, TransferResult.Transferred(expectedBalance));
@@ -64,26 +65,27 @@ namespace OpdexGovernanceTests
             SetupCall(Pool2, 0, GetMiningPoolMethod, null, TransferResult.Transferred(MiningPool2));
             SetupCall(Pool3, 0, GetMiningPoolMethod, null, TransferResult.Transferred(MiningPool3));
             SetupCall(Pool4, 0, GetMiningPoolMethod, null, TransferResult.Transferred(MiningPool4));
-            
+
             SetupMessage(MiningGovernance, ODX);
-            
+
             // Act
-            gov.NotifyDistribution(Serializer.Serialize(pools));
+            gov.NotifyDistribution(pools[0], pools[1], pools[2], pools[3]);
 
             gov.MiningPoolReward.Should().Be(expectedMiningPoolReward);
             gov.MiningPoolsFunded.Should().Be(0);
             gov.Notified.Should().BeFalse();
             gov.Nominations.Length.Should().Be(pools.Length);
+            gov.NominationPeriodEnd.Should().Be(block + BlocksPerMonth);
             foreach (var govNomination in gov.Nominations)
             {
                 pools.ToList().Any(p => p == govNomination.StakingPool).Should().BeTrue();
             }
-            
+
             VerifyCall(Pool1, 0, GetMiningPoolMethod, null, Times.Once);
             VerifyCall(Pool2, 0, GetMiningPoolMethod, null, Times.Once);
             VerifyCall(Pool3, 0, GetMiningPoolMethod, null, Times.Once);
             VerifyCall(Pool4, 0, GetMiningPoolMethod, null, Times.Once);
-            
+
             VerifyCall(ODX, 0ul, nameof(IOpdexMinedToken.GetBalance), getBalanceParams, Times.Once);
         }
 
@@ -91,48 +93,49 @@ namespace OpdexGovernanceTests
         public void NotifyDistribution_Success()
         {
             var gov = CreateNewOpdexMiningGovernance();
-            
+
             SetupMessage(MiningGovernance, ODX);
-            
-            gov.NotifyDistribution(new byte[0]);
+
+            gov.NotifyDistribution(Address.Zero, Address.Zero, Address.Zero, Address.Zero);
 
             gov.Notified.Should().BeTrue();
         }
-        
-        [Fact]
-        public void NotifyDistribution_Success_Locked()
-        {
-            var gov = CreateNewOpdexMiningGovernance();
 
-            SetupMessage(MiningGovernance, ODX);
-            
-            PersistentState.SetBool(nameof(IOpdexMiningGovernance.Locked), true);
-            
-            gov
-                .Invoking(g => g.NotifyDistribution(new byte[0]))
-                .Should()
-                .Throw<SmartContractAssertException>()
-                .WithMessage("OPDEX: LOCKED");
-        }
-        
         [Fact]
         public void NotifyDistribution_Throws_InvalidSender()
         {
             var gov = CreateNewOpdexMiningGovernance();
 
             SetupMessage(MiningGovernance, Miner);
-            
+
             gov
-                .Invoking(g => g.NotifyDistribution(new byte[0]))
+                .Invoking(g => g.NotifyDistribution(Address.Zero, Address.Zero, Address.Zero, Address.Zero))
                 .Should()
                 .Throw<SmartContractAssertException>()
                 .WithMessage("OPDEX: INVALID_SENDER");
         }
-        
+
+        [Fact]
+        public void NotifyDistribution_Throws_InvalidMiningPool()
+        {
+            var pools = new[] { Pool1, Pool2, Pool3, Pool4 };
+            var gov = CreateNewOpdexMiningGovernance();
+
+            SetupMessage(MiningGovernance, ODX);
+
+            SetupCall(Pool1, 0, GetMiningPoolMethod, null, TransferResult.Transferred(Address.Zero));
+
+            gov
+                .Invoking(g => g.NotifyDistribution(pools[0], pools[1], pools[2], pools[3]))
+                .Should()
+                .Throw<SmartContractAssertException>()
+                .WithMessage("OPDEX: INVALID_MINING_POOL");
+        }
+
         #endregion
-        
+
         #region Nominite Liquidity Pool Tests
-        
+
         [Fact]
         public void NominateLiquidityPool_ExistingNominationUpdate_Success()
         {
@@ -140,7 +143,7 @@ namespace OpdexGovernanceTests
             var nominatedMiningPool = MiningPool3;
             UInt256 nominationWeight = 100_000_000;
             const int expectedAffectedIndex = 2;
-            
+
             var nominations = new[]
             {
                 new Nomination {StakingPool = Pool1, Weight = 50_000_000},
@@ -148,18 +151,18 @@ namespace OpdexGovernanceTests
                 new Nomination {StakingPool = Pool3, Weight = 90_000_000},
                 new Nomination {StakingPool = Pool4, Weight = 200_000_000}
             };
-            
+
             var gov = CreateNewOpdexMiningGovernance();
 
             SetupMessage(MiningGovernance, ODX);
 
-            PersistentState.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
-            PersistentState.SetUInt64(nameof(IOpdexMiningGovernance.NominationPeriodEnd), 100_000);
-            PersistentState.SetAddress($"MiningPool:{nominatedLiquidityPool}", nominatedMiningPool);
-            
+            State.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
+            State.SetUInt64(nameof(IOpdexMiningGovernance.NominationPeriodEnd), 100_000);
+            State.SetAddress($"MiningPool:{nominatedLiquidityPool}", nominatedMiningPool);
+
             gov.NominateLiquidityPool(nominatedLiquidityPool, nominationWeight);
             gov.Nominations.Length.Should().Be(4);
-            
+
             for (var i = 0; i < gov.Nominations.Length; i++)
             {
                 var expectedWeight = i == expectedAffectedIndex ? nominationWeight : nominations[i].Weight;
@@ -175,7 +178,7 @@ namespace OpdexGovernanceTests
                 MiningPool = nominatedMiningPool
             }, Times.Once);
         }
-        
+
         [Fact]
         public void NominateLiquidityPool_Does_QualifyAgainstExistingNominations_Success()
         {
@@ -183,7 +186,7 @@ namespace OpdexGovernanceTests
             var nominationMiningPool = MiningPool5;
             UInt256 nominationWeight = 400_000_000;
             const int expectedAffectedIndex = 1;
-            
+
             var nominations = new[]
             {
                 new Nomination {StakingPool = Pool1, Weight = 300_000_000},
@@ -191,29 +194,29 @@ namespace OpdexGovernanceTests
                 new Nomination {StakingPool = Pool3, Weight = 190_000_000},
                 new Nomination {StakingPool = Pool4, Weight = 200_000_000}
             };
-            
+
             var gov = CreateNewOpdexMiningGovernance();
 
             SetupMessage(MiningGovernance, ODX);
 
             SetupCall(nominatedLiquidityPool, 0, GetMiningPoolMethod, null, TransferResult.Transferred(nominationMiningPool));
 
-            PersistentState.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
-            PersistentState.SetUInt64(nameof(IOpdexMiningGovernance.NominationPeriodEnd), 100_000);
-            
+            State.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
+            State.SetUInt64(nameof(IOpdexMiningGovernance.NominationPeriodEnd), 100_000);
+
             gov.NominateLiquidityPool(nominatedLiquidityPool, nominationWeight);
             gov.Nominations.Length.Should().Be(4);
-            
+
             for (var i = 0; i < gov.Nominations.Length; i++)
             {
                 var expectedWeight = i == expectedAffectedIndex ? nominationWeight : nominations[i].Weight;
                 var expectedPool = i == expectedAffectedIndex ? nominatedLiquidityPool : nominations[i].StakingPool;
-                
+
                 var govNomination = gov.Nominations[i];
                 govNomination.StakingPool.Should().Be(expectedPool);
                 govNomination.Weight.Should().Be(expectedWeight);
             }
-            
+
             VerifyCall(nominatedLiquidityPool, 0, GetMiningPoolMethod, null, Times.Once);
 
             VerifyLog(new NominationLog
@@ -223,7 +226,7 @@ namespace OpdexGovernanceTests
                 MiningPool = nominationMiningPool
             }, Times.Once);
         }
-        
+
         [Fact]
         public void NominateLiquidityPool_DoesNot_QualifyAgainstExistingNominations_Success()
         {
@@ -234,14 +237,14 @@ namespace OpdexGovernanceTests
                 new Nomination {StakingPool = Pool3, Weight = 190_000_000},
                 new Nomination {StakingPool = Pool4, Weight = 200_000_000}
             };
-            
+
             var gov = CreateNewOpdexMiningGovernance();
 
             SetupMessage(MiningGovernance, ODX);
 
-            PersistentState.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
-            PersistentState.SetUInt64(nameof(IOpdexMiningGovernance.NominationPeriodEnd), 100_000);
-            
+            State.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
+            State.SetUInt64(nameof(IOpdexMiningGovernance.NominationPeriodEnd), 100_000);
+
             gov.NominateLiquidityPool(Pool5, 150_000_000);
 
             for (var i = 0; i < nominations.Length; i++)
@@ -250,36 +253,31 @@ namespace OpdexGovernanceTests
                 gov.Nominations[i].Weight.Should().Be(nominations[i].Weight);
             }
 
-            VerifyLog(new NominationLog
-            {
-                StakingPool = It.IsAny<Address>(),
-                Weight = It.IsAny<UInt256>(),
-                MiningPool = It.IsAny<Address>()
-            }, Times.Never);
+            VerifyLog(It.IsAny<NominationLog>(), Times.Never);
         }
 
         [Fact]
         public void NominateLiquidityPool_Throws_InvalidSender()
         {
             UInt256 nominationWeight = 100_000;
-            
+
             var gov = CreateNewOpdexMiningGovernance();
 
             SetupMessage(MiningGovernance, Miner);
-            
+
             gov
                 .Invoking(g => g.NominateLiquidityPool(Pool5, nominationWeight))
                 .Should()
                 .Throw<SmartContractAssertException>()
                 .WithMessage("OPDEX: INVALID_SENDER");
         }
-        
+
         [Fact]
         public void NominateLiquidityPool_Throws_InvalidMiningPool()
         {
             var nominatedLiquidityPool = Pool5;
             UInt256 nominationWeight = 400_000_000;
-            
+
             var nominations = new[]
             {
                 new Nomination {StakingPool = Pool1, Weight = 300_000_000},
@@ -287,14 +285,14 @@ namespace OpdexGovernanceTests
                 new Nomination {StakingPool = Pool3, Weight = 190_000_000},
                 new Nomination {StakingPool = Pool4, Weight = 200_000_000}
             };
-            
+
             var gov = CreateNewOpdexMiningGovernance();
 
             SetupMessage(MiningGovernance, ODX);
-            
-            PersistentState.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
-            PersistentState.SetUInt64(nameof(IOpdexMiningGovernance.NominationPeriodEnd), 100_000);
-            
+
+            State.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
+            State.SetUInt64(nameof(IOpdexMiningGovernance.NominationPeriodEnd), 100_000);
+
             SetupCall(nominatedLiquidityPool, 0, GetMiningPoolMethod, null, TransferResult.Transferred(Address.Zero));
 
             gov
@@ -303,10 +301,35 @@ namespace OpdexGovernanceTests
                 .Throw<SmartContractAssertException>()
                 .WithMessage("OPDEX: INVALID_MINING_POOL");
         }
-        
+
+        [Fact]
+        public void NominateLiquidityPool_Returns_NominationPeriodEnd()
+        {
+            const ulong block = 100;
+            var nominations = new[]
+            {
+                new Nomination {StakingPool = Pool1, Weight = 300},
+                new Nomination {StakingPool = Pool2, Weight = 50},
+                new Nomination {StakingPool = Pool3, Weight = 190},
+                new Nomination {StakingPool = Pool4, Weight = 210}
+            };
+
+            var gov = CreateNewOpdexMiningGovernance(block);
+
+            State.SetUInt64(nameof(IOpdexMiningGovernance.NominationPeriodEnd), block);
+            State.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
+
+            SetupMessage(MiningGovernance, ODX);
+
+            gov.NominateLiquidityPool(Pool5, 500);
+
+            gov.Nominations.All(n => n.StakingPool != Pool5).Should().BeTrue();
+            VerifyLog(It.IsAny<NominationLog>(), Times.Never);
+        }
+
         #endregion
-        
-        #region Notify Mining Pools
+
+        #region Reward Mining Pools
 
         [Fact]
         public void RewardMiningPools_All_Success()
@@ -314,7 +337,7 @@ namespace OpdexGovernanceTests
             UInt256 miningPoolReward = 100_000_000;
             const ulong currentBlock = 100_001;
             UInt256 expectedNominationWeight = 1;
-            
+
             var gov = CreateNewOpdexMiningGovernance();
             var nominations = new[]
             {
@@ -329,13 +352,13 @@ namespace OpdexGovernanceTests
 
             var transferToPool1Params = new object[] { MiningPool1, miningPoolReward };
             SetupCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToPool1Params, TransferResult.Transferred(true));
-            
+
             var transferToPool2Params = new object[] { MiningPool2, miningPoolReward };
             SetupCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToPool2Params, TransferResult.Transferred(true));
-            
+
             var transferToPool3Params = new object[] { MiningPool3, miningPoolReward };
             SetupCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToPool3Params, TransferResult.Transferred(true));
-            
+
             var transferToPool4Params = new object[] { MiningPool4, miningPoolReward };
             SetupCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToPool4Params, TransferResult.Transferred(true));
 
@@ -345,19 +368,19 @@ namespace OpdexGovernanceTests
             SetupCall(MiningPool2, 0ul, NotifyRewardAmountMethod, notifyParams, TransferResult.Transferred(null));
             SetupCall(MiningPool3, 0ul, NotifyRewardAmountMethod, notifyParams, TransferResult.Transferred(null));
             SetupCall(MiningPool4, 0ul, NotifyRewardAmountMethod, notifyParams, TransferResult.Transferred(null));
-            
-            PersistentState.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
-            PersistentState.SetUInt256(nameof(IOpdexMiningGovernance.MiningPoolReward), miningPoolReward);
-            PersistentState.SetAddress($"MiningPool:{Pool1}", MiningPool1);
-            PersistentState.SetAddress($"MiningPool:{Pool2}", MiningPool2);
-            PersistentState.SetAddress($"MiningPool:{Pool3}", MiningPool3);
-            PersistentState.SetAddress($"MiningPool:{Pool4}", MiningPool4);
+
+            State.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
+            State.SetUInt256(nameof(IOpdexMiningGovernance.MiningPoolReward), miningPoolReward);
+            State.SetAddress($"MiningPool:{Pool1}", MiningPool1);
+            State.SetAddress($"MiningPool:{Pool2}", MiningPool2);
+            State.SetAddress($"MiningPool:{Pool3}", MiningPool3);
+            State.SetAddress($"MiningPool:{Pool4}", MiningPool4);
 
             gov.RewardMiningPools();
             gov.MiningPoolsFunded.Should().Be(4);
             gov.Nominations.Length.Should().Be(4);
             gov.NominationPeriodEnd.Should().Be(currentBlock + BlocksPerMonth);
-            
+
             for (var i = 0; i < gov.Nominations.Length; i++)
             {
                 var govNomination = gov.Nominations[i];
@@ -369,7 +392,7 @@ namespace OpdexGovernanceTests
             VerifyCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToPool2Params, Times.AtLeastOnce);
             VerifyCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToPool3Params, Times.AtLeastOnce);
             VerifyCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToPool4Params, Times.AtLeastOnce);
-            
+
             VerifyCall(MiningPool1, 0ul, NotifyRewardAmountMethod, notifyParams, Times.Once);
             VerifyCall(MiningPool2, 0ul, NotifyRewardAmountMethod, notifyParams, Times.Once);
             VerifyCall(MiningPool3, 0ul, NotifyRewardAmountMethod, notifyParams, Times.Once);
@@ -380,14 +403,14 @@ namespace OpdexGovernanceTests
             VerifyLog(new RewardMiningPoolLog { StakingPool = Pool3, MiningPool = MiningPool3, Amount = miningPoolReward }, Times.Once);
             VerifyLog(new RewardMiningPoolLog { StakingPool = Pool4, MiningPool = MiningPool4, Amount = miningPoolReward }, Times.Once);
         }
-        
+
         [Fact]
         public void RewardMiningPools_Remaining_Success()
         {
             UInt256 miningPoolReward = 100_000_000;
             const ulong currentBlock = 100_001;
             UInt256 expectedNominationWeight = 1;
-            
+
             var gov = CreateNewOpdexMiningGovernance();
             var nominations = new[]
             {
@@ -402,10 +425,10 @@ namespace OpdexGovernanceTests
 
             var transferToPool2Params = new object[] { MiningPool2, miningPoolReward };
             SetupCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToPool2Params, TransferResult.Transferred(true));
-            
+
             var transferToPool3Params = new object[] { MiningPool3, miningPoolReward };
             SetupCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToPool3Params, TransferResult.Transferred(true));
-            
+
             var transferToPool4Params = new object[] { MiningPool4, miningPoolReward };
             SetupCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToPool4Params, TransferResult.Transferred(true));
 
@@ -414,21 +437,21 @@ namespace OpdexGovernanceTests
             SetupCall(MiningPool2, 0ul, NotifyRewardAmountMethod, notifyParams, TransferResult.Transferred(null));
             SetupCall(MiningPool3, 0ul, NotifyRewardAmountMethod, notifyParams, TransferResult.Transferred(null));
             SetupCall(MiningPool4, 0ul, NotifyRewardAmountMethod, notifyParams, TransferResult.Transferred(null));
-            
-            PersistentState.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
-            PersistentState.SetUInt256(nameof(IOpdexMiningGovernance.MiningPoolReward), miningPoolReward);
-            PersistentState.SetUInt32(nameof(IOpdexMiningGovernance.MiningPoolsFunded), 1);
-            PersistentState.SetAddress($"MiningPool:{Pool1}", MiningPool1);
-            PersistentState.SetAddress($"MiningPool:{Pool2}", MiningPool2);
-            PersistentState.SetAddress($"MiningPool:{Pool3}", MiningPool3);
-            PersistentState.SetAddress($"MiningPool:{Pool4}", MiningPool4);
+
+            State.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
+            State.SetUInt256(nameof(IOpdexMiningGovernance.MiningPoolReward), miningPoolReward);
+            State.SetUInt32(nameof(IOpdexMiningGovernance.MiningPoolsFunded), 1);
+            State.SetAddress($"MiningPool:{Pool1}", MiningPool1);
+            State.SetAddress($"MiningPool:{Pool2}", MiningPool2);
+            State.SetAddress($"MiningPool:{Pool3}", MiningPool3);
+            State.SetAddress($"MiningPool:{Pool4}", MiningPool4);
 
             gov.MiningPoolsFunded.Should().Be(1);
             gov.RewardMiningPools();
             gov.MiningPoolsFunded.Should().Be(4);
             gov.Nominations.Length.Should().Be(4);
             gov.NominationPeriodEnd.Should().Be(currentBlock + BlocksPerMonth);
-            
+
             for (var i = 0; i < gov.Nominations.Length; i++)
             {
                 var govNomination = gov.Nominations[i];
@@ -439,17 +462,17 @@ namespace OpdexGovernanceTests
             VerifyCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToPool2Params, Times.AtLeastOnce);
             VerifyCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToPool3Params, Times.AtLeastOnce);
             VerifyCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToPool4Params, Times.AtLeastOnce);
-            
+
             VerifyCall(MiningPool1, 0ul, NotifyRewardAmountMethod, notifyParams, Times.Never);
             VerifyCall(MiningPool2, 0ul, NotifyRewardAmountMethod, notifyParams, Times.Once);
             VerifyCall(MiningPool3, 0ul, NotifyRewardAmountMethod, notifyParams, Times.Once);
             VerifyCall(MiningPool4, 0ul, NotifyRewardAmountMethod, notifyParams, Times.Once);
-            
+
             VerifyLog(new RewardMiningPoolLog { StakingPool = Pool2, MiningPool = MiningPool2, Amount = miningPoolReward }, Times.Once);
             VerifyLog(new RewardMiningPoolLog { StakingPool = Pool3, MiningPool = MiningPool3, Amount = miningPoolReward }, Times.Once);
             VerifyLog(new RewardMiningPoolLog { StakingPool = Pool4, MiningPool = MiningPool4, Amount = miningPoolReward }, Times.Once);
         }
-        
+
         [Fact]
         public void RewardMiningPools_All_ResetYearly_Success()
         {
@@ -458,7 +481,7 @@ namespace OpdexGovernanceTests
             const bool notified = true;
             const uint miningPoolsPerYear = 48;
             UInt256 expectedNominationWeight = 1;
-            
+
             var gov = CreateNewOpdexMiningGovernance();
             var nominations = new[]
             {
@@ -473,13 +496,13 @@ namespace OpdexGovernanceTests
 
             var transferToPool1Params = new object[] { MiningPool1, miningPoolReward };
             SetupCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToPool1Params, TransferResult.Transferred(true));
-            
+
             var transferToPool2Params = new object[] { MiningPool2, miningPoolReward };
             SetupCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToPool2Params, TransferResult.Transferred(true));
-            
+
             var transferToPool3Params = new object[] { MiningPool3, miningPoolReward };
             SetupCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToPool3Params, TransferResult.Transferred(true));
-            
+
             var transferToPool4Params = new object[] { MiningPool4, miningPoolReward };
             SetupCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToPool4Params, TransferResult.Transferred(true));
 
@@ -488,19 +511,19 @@ namespace OpdexGovernanceTests
             SetupCall(MiningPool2, 0ul, NotifyRewardAmountMethod, notifyParams, TransferResult.Transferred(null));
             SetupCall(MiningPool3, 0ul, NotifyRewardAmountMethod, notifyParams, TransferResult.Transferred(null));
             SetupCall(MiningPool4, 0ul, NotifyRewardAmountMethod, notifyParams, TransferResult.Transferred(null));
-            
+
             // Get Balance of Mining Governance
             var getBalanceParams = new object[] { MiningGovernance };
             SetupCall(ODX, 0ul, nameof(IOpdexMinedToken.GetBalance), getBalanceParams, TransferResult.Transferred(miningPoolReward * 2 * miningPoolsPerYear));
-            
-            PersistentState.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
-            PersistentState.SetUInt256(nameof(IOpdexMiningGovernance.MiningPoolReward), miningPoolReward);
-            PersistentState.SetBool(nameof(IOpdexMiningGovernance.Notified), notified);
-            PersistentState.SetUInt32(nameof(IOpdexMiningGovernance.MiningPoolsFunded), 44);
-            PersistentState.SetAddress($"MiningPool:{Pool1}", MiningPool1);
-            PersistentState.SetAddress($"MiningPool:{Pool2}", MiningPool2);
-            PersistentState.SetAddress($"MiningPool:{Pool3}", MiningPool3);
-            PersistentState.SetAddress($"MiningPool:{Pool4}", MiningPool4);
+
+            State.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
+            State.SetUInt256(nameof(IOpdexMiningGovernance.MiningPoolReward), miningPoolReward);
+            State.SetBool(nameof(IOpdexMiningGovernance.Notified), notified);
+            State.SetUInt32(nameof(IOpdexMiningGovernance.MiningPoolsFunded), 44);
+            State.SetAddress($"MiningPool:{Pool1}", MiningPool1);
+            State.SetAddress($"MiningPool:{Pool2}", MiningPool2);
+            State.SetAddress($"MiningPool:{Pool3}", MiningPool3);
+            State.SetAddress($"MiningPool:{Pool4}", MiningPool4);
 
             gov.RewardMiningPools();
             gov.MiningPoolsFunded.Should().Be(0);
@@ -520,12 +543,12 @@ namespace OpdexGovernanceTests
             VerifyCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToPool2Params, Times.AtLeastOnce);
             VerifyCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToPool3Params, Times.AtLeastOnce);
             VerifyCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToPool4Params, Times.AtLeastOnce);
-            
+
             VerifyCall(MiningPool1, 0ul, NotifyRewardAmountMethod, notifyParams, Times.Once);
             VerifyCall(MiningPool2, 0ul, NotifyRewardAmountMethod, notifyParams, Times.Once);
             VerifyCall(MiningPool3, 0ul, NotifyRewardAmountMethod, notifyParams, Times.Once);
             VerifyCall(MiningPool4, 0ul, NotifyRewardAmountMethod, notifyParams, Times.Once);
-            
+
             VerifyCall(ODX, 0ul, nameof(IOpdexMinedToken.GetBalance), getBalanceParams, Times.Once);
 
             VerifyLog(new RewardMiningPoolLog { StakingPool = Pool1, MiningPool = MiningPool1, Amount = miningPoolReward }, Times.Once);
@@ -533,10 +556,10 @@ namespace OpdexGovernanceTests
             VerifyLog(new RewardMiningPoolLog { StakingPool = Pool3, MiningPool = MiningPool3, Amount = miningPoolReward }, Times.Once);
             VerifyLog(new RewardMiningPoolLog { StakingPool = Pool4, MiningPool = MiningPool4, Amount = miningPoolReward }, Times.Once);
         }
-        
+
         #endregion
 
-        #region Notify Mining Pool
+        #region Reward Mining Pool
 
         [Fact]
         public void RewardMiningPool_NotLast_Success()
@@ -559,17 +582,17 @@ namespace OpdexGovernanceTests
 
             var notifyParams = new object[] {miningPoolReward};
             SetupCall(MiningPool1, 0ul, NotifyRewardAmountMethod, notifyParams, TransferResult.Transferred(null));
-            
-            PersistentState.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
-            PersistentState.SetUInt256(nameof(IOpdexMiningGovernance.MiningPoolReward), miningPoolReward);
-            PersistentState.SetAddress($"MiningPool:{Pool1}", MiningPool1);
+
+            State.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
+            State.SetUInt256(nameof(IOpdexMiningGovernance.MiningPoolReward), miningPoolReward);
+            State.SetAddress($"MiningPool:{Pool1}", MiningPool1);
 
             gov.RewardMiningPool();
             gov.MiningPoolsFunded.Should().Be(1);
             gov.Nominations[0].StakingPool.Should().Be(Pool1);
             gov.Nominations[0].Weight.Should().Be(UInt256.Zero);
             gov.Nominations.Length.Should().Be(4);
-            
+
             for (var i = 0; i < gov.Nominations.Length; i++)
             {
                 var expectedWeight = i == 0 ? UInt256.Zero : nominations[i].Weight;
@@ -588,7 +611,7 @@ namespace OpdexGovernanceTests
                 Amount = miningPoolReward
             }, Times.Once);
         }
-        
+
         [Fact]
         public void RewardMiningPool_Last_Success()
         {
@@ -617,18 +640,18 @@ namespace OpdexGovernanceTests
             var notifyParams = new object[] {miningPoolReward};
             SetupCall(MiningPool4, 0ul, NotifyRewardAmountMethod, notifyParams, TransferResult.Transferred(null));
 
-            PersistentState.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
-            PersistentState.SetUInt256(nameof(IOpdexMiningGovernance.MiningPoolReward), miningPoolReward);
-            PersistentState.SetUInt32(nameof(IOpdexMiningGovernance.MiningPoolsFunded), 3);
-            PersistentState.SetUInt64(nameof(IOpdexMiningGovernance.NominationPeriodEnd), nominationPeriodEnd);
-            PersistentState.SetAddress($"MiningPool:{Pool4}", MiningPool4);
+            State.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
+            State.SetUInt256(nameof(IOpdexMiningGovernance.MiningPoolReward), miningPoolReward);
+            State.SetUInt32(nameof(IOpdexMiningGovernance.MiningPoolsFunded), 3);
+            State.SetUInt64(nameof(IOpdexMiningGovernance.NominationPeriodEnd), nominationPeriodEnd);
+            State.SetAddress($"MiningPool:{Pool4}", MiningPool4);
 
             gov.RewardMiningPool();
             gov.MiningPoolsFunded.Should().Be(4);
             gov.Nominations.Length.Should().Be(4);
             gov.Notified.Should().BeFalse();
             gov.MiningPoolReward.Should().Be(miningPoolReward);
-            
+
             for (var i = 0; i < gov.Nominations.Length; i++)
             {
                 var govNomination = gov.Nominations[i];
@@ -646,7 +669,7 @@ namespace OpdexGovernanceTests
                 Amount = miningPoolReward
             }, Times.Once);
         }
-        
+
         [Fact]
         public void RewardMiningPool_Last_ResetYearly_Success()
         {
@@ -676,17 +699,17 @@ namespace OpdexGovernanceTests
             // Notify Mining Pool
             var notifyParams = new object[] {miningPoolReward};
             SetupCall(MiningPool4, 0ul, NotifyRewardAmountMethod, notifyParams, TransferResult.Transferred(null));
-            
+
             // Get Balance of Mining Governance
             var getBalanceParams = new object[] { MiningGovernance };
             SetupCall(ODX, 0ul, nameof(IOpdexMinedToken.GetBalance), getBalanceParams, TransferResult.Transferred(miningPoolReward * 2 * miningPoolsPerYear));
 
-            PersistentState.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
-            PersistentState.SetUInt256(nameof(IOpdexMiningGovernance.MiningPoolReward), miningPoolReward);
-            PersistentState.SetUInt32(nameof(IOpdexMiningGovernance.MiningPoolsFunded), 47);
-            PersistentState.SetUInt64(nameof(IOpdexMiningGovernance.NominationPeriodEnd), nominationPeriodEnd);
-            PersistentState.SetBool(nameof(IOpdexMiningGovernance.Notified), notified);
-            PersistentState.SetAddress($"MiningPool:{Pool4}", MiningPool4);
+            State.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
+            State.SetUInt256(nameof(IOpdexMiningGovernance.MiningPoolReward), miningPoolReward);
+            State.SetUInt32(nameof(IOpdexMiningGovernance.MiningPoolsFunded), 47);
+            State.SetUInt64(nameof(IOpdexMiningGovernance.NominationPeriodEnd), nominationPeriodEnd);
+            State.SetBool(nameof(IOpdexMiningGovernance.Notified), notified);
+            State.SetAddress($"MiningPool:{Pool4}", MiningPool4);
 
             gov.RewardMiningPool();
             gov.MiningPoolsFunded.Should().Be(0);
@@ -694,7 +717,7 @@ namespace OpdexGovernanceTests
             gov.NominationPeriodEnd.Should().Be(currentBlock + BlocksPerMonth);
             gov.Notified.Should().BeFalse();
             gov.MiningPoolReward.Should().Be(miningPoolReward * 2);
-            
+
             for (var i = 0; i < gov.Nominations.Length; i++)
             {
                 var govNomination = gov.Nominations[i];
@@ -713,7 +736,7 @@ namespace OpdexGovernanceTests
                 Amount = miningPoolReward
             }, Times.Once);
         }
-        
+
         [Fact]
         public void RewardMiningPool_IgnoreFailed_NotifyRewardAmount_Success()
         {
@@ -742,11 +765,11 @@ namespace OpdexGovernanceTests
             var notifyParams = new object[] {miningPoolReward};
             SetupCall(MiningPool4, 0ul, NotifyRewardAmountMethod, notifyParams, TransferResult.Failed());
 
-            PersistentState.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
-            PersistentState.SetUInt256(nameof(IOpdexMiningGovernance.MiningPoolReward), miningPoolReward);
-            PersistentState.SetUInt32(nameof(IOpdexMiningGovernance.MiningPoolsFunded), 15);
-            PersistentState.SetUInt64(nameof(IOpdexMiningGovernance.NominationPeriodEnd), nominationPeriodEnd);
-            PersistentState.SetAddress($"MiningPool:{Pool4}", MiningPool4);
+            State.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
+            State.SetUInt256(nameof(IOpdexMiningGovernance.MiningPoolReward), miningPoolReward);
+            State.SetUInt32(nameof(IOpdexMiningGovernance.MiningPoolsFunded), 15);
+            State.SetUInt64(nameof(IOpdexMiningGovernance.NominationPeriodEnd), nominationPeriodEnd);
+            State.SetAddress($"MiningPool:{Pool4}", MiningPool4);
 
             gov.RewardMiningPool();
             gov.MiningPoolsFunded.Should().Be(16);
@@ -754,7 +777,7 @@ namespace OpdexGovernanceTests
             gov.NominationPeriodEnd.Should().Be(currentBlock + BlocksPerMonth);
             gov.Notified.Should().BeFalse();
             gov.MiningPoolReward.Should().Be(miningPoolReward);
-            
+
             for (var i = 0; i < gov.Nominations.Length; i++)
             {
                 var govNomination = gov.Nominations[i];
@@ -801,17 +824,17 @@ namespace OpdexGovernanceTests
             // Notify Mining Pool
             var notifyParams = new object[] {miningPoolReward};
             SetupCall(MiningPool4, 0ul, NotifyRewardAmountMethod, notifyParams, TransferResult.Transferred(null));
-            
+
             // Get Balance of Mining Governance
             var getBalanceParams = new object[] { MiningGovernance };
             SetupCall(ODX, 0ul, nameof(IOpdexMinedToken.GetBalance), getBalanceParams, TransferResult.Transferred(miningPoolReward * 2 * miningPoolsPerYear));
 
-            PersistentState.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
-            PersistentState.SetUInt256(nameof(IOpdexMiningGovernance.MiningPoolReward), miningPoolReward);
-            PersistentState.SetUInt32(nameof(IOpdexMiningGovernance.MiningPoolsFunded), 47);
-            PersistentState.SetUInt64(nameof(IOpdexMiningGovernance.NominationPeriodEnd), nominationPeriodEnd);
-            PersistentState.SetBool(nameof(IOpdexMiningGovernance.Notified), notified);
-            PersistentState.SetAddress($"MiningPool:{Pool4}", MiningPool4);
+            State.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
+            State.SetUInt256(nameof(IOpdexMiningGovernance.MiningPoolReward), miningPoolReward);
+            State.SetUInt32(nameof(IOpdexMiningGovernance.MiningPoolsFunded), 47);
+            State.SetUInt64(nameof(IOpdexMiningGovernance.NominationPeriodEnd), nominationPeriodEnd);
+            State.SetBool(nameof(IOpdexMiningGovernance.Notified), notified);
+            State.SetAddress($"MiningPool:{Pool4}", MiningPool4);
 
             gov
                 .Invoking(g => g.RewardMiningPool())
@@ -819,7 +842,7 @@ namespace OpdexGovernanceTests
                 .Throw<SmartContractAssertException>()
                 .WithMessage("OPDEX: TOKEN_DISTRIBUTION_REQUIRED");
         }
-        
+
         [Fact]
         public void RewardMiningPool_Last_Throws_InvalidBalance()
         {
@@ -847,17 +870,17 @@ namespace OpdexGovernanceTests
             // Notify Mining Pool
             var notifyParams = new object[] {miningPoolReward};
             SetupCall(MiningPool4, 0ul, NotifyRewardAmountMethod, notifyParams, TransferResult.Transferred(null));
-            
+
             // Get Balance of Mining Governance
             var getBalanceParams = new object[] { MiningGovernance };
             SetupCall(ODX, 0ul, nameof(IOpdexMinedToken.GetBalance), getBalanceParams, TransferResult.Transferred((UInt256)1));
 
-            PersistentState.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
-            PersistentState.SetUInt256(nameof(IOpdexMiningGovernance.MiningPoolReward), miningPoolReward);
-            PersistentState.SetUInt32(nameof(IOpdexMiningGovernance.MiningPoolsFunded), 47);
-            PersistentState.SetUInt64(nameof(IOpdexMiningGovernance.NominationPeriodEnd), nominationPeriodEnd);
-            PersistentState.SetBool(nameof(IOpdexMiningGovernance.Notified), notified);
-            PersistentState.SetAddress($"MiningPool:{Pool4}", MiningPool4);
+            State.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
+            State.SetUInt256(nameof(IOpdexMiningGovernance.MiningPoolReward), miningPoolReward);
+            State.SetUInt32(nameof(IOpdexMiningGovernance.MiningPoolsFunded), 47);
+            State.SetUInt64(nameof(IOpdexMiningGovernance.NominationPeriodEnd), nominationPeriodEnd);
+            State.SetBool(nameof(IOpdexMiningGovernance.Notified), notified);
+            State.SetAddress($"MiningPool:{Pool4}", MiningPool4);
 
             gov
                 .Invoking(g => g.RewardMiningPool())
@@ -865,7 +888,7 @@ namespace OpdexGovernanceTests
                 .Throw<SmartContractAssertException>()
                 .WithMessage("OPDEX: INVALID_BALANCE");
         }
-        
+
          [Fact]
         public void RewardMiningPool_Last_Throws_InvalidTransferTo()
         {
@@ -889,12 +912,12 @@ namespace OpdexGovernanceTests
             var transferToParams = new object[] { MiningPool4, miningPoolReward };
             SetupCall(ODX, 0ul, nameof(IOpdexMinedToken.TransferTo), transferToParams, TransferResult.Failed());
 
-            PersistentState.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
-            PersistentState.SetUInt256(nameof(IOpdexMiningGovernance.MiningPoolReward), miningPoolReward);
-            PersistentState.SetUInt32(nameof(IOpdexMiningGovernance.MiningPoolsFunded), 47);
-            PersistentState.SetUInt64(nameof(IOpdexMiningGovernance.NominationPeriodEnd), nominationPeriodEnd);
-            PersistentState.SetBool(nameof(IOpdexMiningGovernance.Notified), notified);
-            PersistentState.SetAddress($"MiningPool:{Pool4}", MiningPool4);
+            State.SetArray(nameof(IOpdexMiningGovernance.Nominations), nominations);
+            State.SetUInt256(nameof(IOpdexMiningGovernance.MiningPoolReward), miningPoolReward);
+            State.SetUInt32(nameof(IOpdexMiningGovernance.MiningPoolsFunded), 47);
+            State.SetUInt64(nameof(IOpdexMiningGovernance.NominationPeriodEnd), nominationPeriodEnd);
+            State.SetBool(nameof(IOpdexMiningGovernance.Notified), notified);
+            State.SetAddress($"MiningPool:{Pool4}", MiningPool4);
 
             gov
                 .Invoking(g => g.RewardMiningPool())
@@ -912,13 +935,13 @@ namespace OpdexGovernanceTests
             var token2 = Serializer.ToAddress("PDArZge8uxydeNGcN21Fc8fQ9AmsVKQLeR");
             var token3 = Serializer.ToAddress("PFN3DovPUpgSJZivtQ8BDDsAHcZniUmshx");
             var token4 = Serializer.ToAddress("PVEYZzRJs9bEYw2VQG2o7AfCsUtX6cYGBv");
-        
+
             _testOutputHelper.WriteLine(token1.ToString());
-            
+
             var hexString = Serializer.Serialize(new[] {token1, token2, token3, token4}).ToHexString();
-            
+
             _testOutputHelper.WriteLine(hexString);
-        
+
             var addresses = Serializer.ToArray<Address>(hexString.HexToByteArray());
 
             foreach (var address in addresses)
