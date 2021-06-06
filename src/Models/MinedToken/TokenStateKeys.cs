@@ -7,7 +7,7 @@ public struct TokenStateKeys
     public const string Creator = "TE";
     public const string MiningGovernance = "TF";
     public const string Vault = "TG";
-    public const string VaultSchedule = "Th";
+    public const string VaultSchedule = "TH";
     public const string MiningSchedule = "TI";
     public const string Genesis = "TJ";
     public const string PeriodIndex = "TK";
