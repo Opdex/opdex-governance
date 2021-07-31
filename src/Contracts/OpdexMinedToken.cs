@@ -11,18 +11,21 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
     /// Constructor initializing opdex token contract.
     /// </summary>
     /// <param name="state">Smart contract state.</param>
+    /// <param name="name">The name of the token.</param>
+    /// <param name="symbol">The token's ticker symbol.</param>
     /// <param name="vaultDistribution">Serialized UInt256 array of vault distribution amounts.</param>
     /// <param name="miningDistribution">Serialized UInt256 array of mining distribution amounts.</param>
     /// <param name="periodDuration">The number of blocks between token distributions.</param>
-    public OpdexMinedToken(ISmartContractState state, byte[] vaultDistribution, byte[] miningDistribution, ulong periodDuration) : base(state)
+    public OpdexMinedToken(ISmartContractState state, string name, string symbol, byte[] vaultDistribution,
+                           byte[] miningDistribution, ulong periodDuration) : base(state)
     {
         var vaultSchedule = Serializer.ToArray<UInt256>(vaultDistribution);
         var miningSchedule = Serializer.ToArray<UInt256>(miningDistribution);
 
         Assert(vaultSchedule.Length > 1 && vaultSchedule.Length == miningSchedule.Length, "OPDEX: INVALID_DISTRIBUTION_SCHEDULE");
 
-        Name = "Opdex";
-        Symbol = "ODX";
+        Name = name;
+        Symbol = symbol;
         Decimals = 8;
         Creator = Message.Sender;
         VaultSchedule = vaultSchedule;
@@ -148,7 +151,7 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
         if (balance == 0) return;
 
         // Intentionally ignore the response
-        Call(MiningGovernance, 0ul, nameof(NominateLiquidityPool), new object[] {Message.Sender, balance});
+        Call(MiningGovernance, 0ul, nameof(IOpdexMiningGovernance.NominateLiquidityPool), new object[] {Message.Sender, balance});
     }
 
     /// <inheritdoc />
@@ -160,9 +163,18 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
 
         var nominations = new [] {firstNomination, secondNomination, thirdNomination, fourthNomination};
 
-        foreach (var nomination in nominations)
+        for (var i = 0; i < nominations.Length; i++)
         {
+            var nomination = nominations[i];
+
             Assert(nomination != Address.Zero && State.IsContract(nomination), "OPDEX: INVALID_NOMINATION");
+
+            var next = i + 1;
+            while (next < nominations.Length)
+            {
+                Assert(nomination != nominations[next], "OPDEX: DUPLICATE_NOMINATION");
+                next++;
+            }
         }
 
         Genesis = Block.Number;
@@ -183,6 +195,8 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
     /// <inheritdoc />
     public bool TransferTo(Address to, UInt256 amount)
     {
+        if (to == Address.Zero) return false;
+
         if (amount == 0)
         {
             Log(new TransferLog { From = Message.Sender, To = to, Amount = 0 });
@@ -204,6 +218,8 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
     /// <inheritdoc />
     public bool TransferFrom(Address from, Address to, UInt256 amount)
     {
+        if (to == Address.Zero) return false;
+
         if (amount == 0)
         {
             Log(new TransferLog { From = from, To = to, Amount = 0 });
@@ -238,7 +254,7 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
 
     private void DistributeExecute(uint periodIndex, Address[] nominations)
     {
-        var minBlock = periodIndex == 0 ? Genesis : PeriodDuration * periodIndex + Genesis;
+        var minBlock = PeriodDuration * periodIndex + Genesis;
 
         Assert(Block.Number >= minBlock, "OPDEX: DISTRIBUTION_NOT_READY");
 
@@ -274,7 +290,7 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
         TotalSupply += supplyIncrease;
         PeriodIndex++;
 
-        Log(new DistributionLog { MiningAmount = miningTokens, VaultAmount = vaultTokens, PeriodIndex = periodIndex });
+        Log(new DistributionLog { MiningAmount = miningTokens, VaultAmount = vaultTokens, PeriodIndex = periodIndex, TotalSupply = TotalSupply });
     }
 
     private Address InitializeMiningGovernance(ulong periodDuration)

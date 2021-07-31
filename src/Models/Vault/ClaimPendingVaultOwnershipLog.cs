@@ -1,6 +1,6 @@
 using Stratis.SmartContracts;
 
-public struct ChangeVaultOwnerLog
+public struct ClaimPendingVaultOwnershipLog
 {
     [Index] public Address From;
     [Index] public Address To;

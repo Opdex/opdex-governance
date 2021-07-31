@@ -51,6 +51,13 @@ public class OpdexVault : SmartContract, IOpdexVault
     }
 
     /// <inheritdoc />
+    public Address PendingOwner
+    {
+        get => State.GetAddress(VaultStateKeys.PendingOwner);
+        private set => State.SetAddress(VaultStateKeys.PendingOwner, value);
+    }
+
+    /// <inheritdoc />
     public UInt256 TotalSupply
     {
         get => State.GetUInt256(VaultStateKeys.TotalSupply);
@@ -162,13 +169,28 @@ public class OpdexVault : SmartContract, IOpdexVault
     }
 
     /// <inheritdoc />
-    public void SetOwner(Address owner)
+    public void SetPendingOwnership(Address pendingOwner)
     {
         Assert(Message.Sender == Owner, "OPDEX: UNAUTHORIZED");
 
-        Owner = owner;
+        PendingOwner = pendingOwner;
 
-        Log(new ChangeVaultOwnerLog { From = Message.Sender, To = owner });
+        Log(new SetPendingVaultOwnershipLog {From = Message.Sender, To = pendingOwner});
+    }
+
+    /// <inheritdoc />
+    public void ClaimPendingOwnership()
+    {
+        var pendingOwner = PendingOwner;
+
+        Assert(Message.Sender == pendingOwner, "OPDEX: UNAUTHORIZED");
+
+        var oldOwner = Owner;
+
+        Owner = pendingOwner;
+        PendingOwner = Address.Zero;
+
+        Log(new ClaimPendingVaultOwnershipLog {From = oldOwner, To = pendingOwner});
     }
 
     private static VaultCertificate[] InsertCertificate(VaultCertificate[] certificates, UInt256 amount, ulong vestedBlock, bool revoked)

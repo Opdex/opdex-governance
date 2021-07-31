@@ -126,7 +126,8 @@ namespace OpdexGovernanceTests
             {
                 VaultAmount = DefaultVaultSchedule[0],
                 MiningAmount = DefaultMiningSchedule[0],
-                PeriodIndex = 0
+                PeriodIndex = 0,
+                TotalSupply = DefaultMiningSchedule[0] + DefaultVaultSchedule[0]
             }, Times.Once);
         }
 
@@ -170,6 +171,24 @@ namespace OpdexGovernanceTests
                 .Should()
                 .Throw<SmartContractAssertException>()
                 .WithMessage("OPDEX: INVALID_NOMINATION");
+        }
+
+        [Fact]
+        public void DistributeGenesis_Throws_DuplicateNomination()
+        {
+            var token = CreateNewOpdexToken(Serializer.Serialize(DefaultVaultSchedule), Serializer.Serialize(DefaultMiningSchedule));
+
+            State.SetContract(Pool1, true);
+            State.SetContract(Pool2, true);
+            State.SetContract(Pool3, true);
+
+            SetupMessage(ODX, Owner);
+
+            token
+                .Invoking(t => t.DistributeGenesis(Pool1, Pool2, Pool3, Pool3))
+                .Should()
+                .Throw<SmartContractAssertException>()
+                .WithMessage("OPDEX: DUPLICATE_NOMINATION");
         }
 
         #endregion
@@ -229,7 +248,8 @@ namespace OpdexGovernanceTests
             {
                 VaultAmount = DefaultVaultSchedule[scheduleIndex],
                 MiningAmount = DefaultMiningSchedule[scheduleIndex],
-                PeriodIndex = periodIndex
+                PeriodIndex = periodIndex,
+                TotalSupply = expectedTotalSupply
             }, Times.Once);
         }
 
