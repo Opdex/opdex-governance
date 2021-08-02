@@ -193,6 +193,12 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
     }
 
     /// <inheritdoc />
+    public ulong NextDistributionBlock()
+    {
+        return NextDistributionBlock(PeriodDuration, PeriodIndex, Genesis);
+    }
+
+    /// <inheritdoc />
     public bool TransferTo(Address to, UInt256 amount)
     {
         if (to == Address.Zero) return false;
@@ -252,9 +258,16 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
         return true;
     }
 
+    private static ulong NextDistributionBlock(ulong periodDuration, uint periodIndex, ulong genesis)
+    {
+        return (periodDuration * periodIndex) + genesis;
+    }
+
     private void DistributeExecute(uint periodIndex, Address[] nominations)
     {
-        var minBlock = PeriodDuration * periodIndex + Genesis;
+        var periodDuration = PeriodDuration;
+        var genesis = Genesis;
+        var minBlock = NextDistributionBlock(periodDuration, periodIndex, genesis);
 
         Assert(Block.Number >= minBlock, "OPDEX: DISTRIBUTION_NOT_READY");
 
@@ -262,6 +275,7 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
         var vault = Vault;
         var miningSchedule = MiningSchedule;
         var vaultSchedule = VaultSchedule;
+        var totalSupply = TotalSupply;
         var inflationIndex = (uint)vaultSchedule.Length - 1;
         var scheduleIndex = periodIndex < inflationIndex ? periodIndex : inflationIndex;
         var miningTokens = miningSchedule[scheduleIndex];
@@ -287,10 +301,20 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
             Assert(vaultNotification.Success, "OPDEX: FAILED_VAULT_DISTRIBUTION");
         }
 
-        TotalSupply += supplyIncrease;
-        PeriodIndex++;
+        totalSupply += supplyIncrease;
+        TotalSupply = totalSupply;
 
-        Log(new DistributionLog { MiningAmount = miningTokens, VaultAmount = vaultTokens, PeriodIndex = periodIndex, TotalSupply = TotalSupply });
+        var nextPeriodIndex = periodIndex + 1;
+        PeriodIndex = nextPeriodIndex;
+
+        Log(new DistributionLog
+        {
+            MiningAmount = miningTokens,
+            VaultAmount = vaultTokens,
+            PeriodIndex = periodIndex,
+            TotalSupply = totalSupply,
+            NextDistributionBlock = NextDistributionBlock(periodDuration, nextPeriodIndex, genesis)
+        });
     }
 
     private Address InitializeMiningGovernance(ulong periodDuration)

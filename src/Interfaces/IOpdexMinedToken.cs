@@ -6,6 +6,9 @@ public interface IOpdexMinedToken : IStandardToken256
     /// <summary>
     /// The address of the contract creator.
     /// </summary>
+    /// <remarks>
+    /// The creator's privileges include the ability to distribute the genesis tokens.
+    /// </remarks>
     Address Creator { get; }
 
     /// <summary>
@@ -52,6 +55,12 @@ public interface IOpdexMinedToken : IStandardToken256
     /// The token name.
     /// </summary>
     string Name { get; }
+
+    /// <summary>
+    /// Retrieves the next block that distribution is available.
+    /// </summary>
+    /// <returns>The block height of the next distribution.</returns>
+    ulong NextDistributionBlock();
 
     /// <summary>
     /// Mints and distributes tokens according to the vault and mining period schedules.

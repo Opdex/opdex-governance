@@ -15,7 +15,9 @@ public interface IOpdexVault
     /// <summary>
     /// The vault owner's address.
     /// </summary>
+    /// <remarks>
     /// The vault owner's privileges include the ability to create and revoke vault certificates.
+    /// </remarks>
     Address Owner { get; }
 
     /// <summary>

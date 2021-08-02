@@ -89,6 +89,30 @@ namespace OpdexGovernanceTests
                 .WithMessage("OPDEX: INVALID_DISTRIBUTION_SCHEDULE");
         }
 
+        #region Next Distribution Block
+
+        [Theory]
+        [InlineData(0, 0, 0)]
+        [InlineData(1, 100, 1_600)]
+        [InlineData(2, 100, 3_100)]
+        [InlineData(3, 100, 4_600)]
+        [InlineData(4, 100, 6_100)]
+        [InlineData(5, 100, 7_600)]
+        public void GetNextDistributionBlock_Success(uint periodIndex, ulong genesis, ulong expectedNext)
+        {
+            const ulong periodDuration = 1_500;
+
+            var token = CreateNewOpdexToken(Serializer.Serialize(DefaultVaultSchedule), Serializer.Serialize(DefaultMiningSchedule));
+
+            State.SetUInt64(TokenStateKeys.PeriodDuration, periodDuration);
+            State.SetUInt32(TokenStateKeys.PeriodIndex, periodIndex);
+            State.SetUInt64(TokenStateKeys.Genesis, genesis);
+
+            token.NextDistributionBlock().Should().Be(expectedNext);
+        }
+
+        #endregion
+
         #region Distribute Genesis
 
         [Fact]
@@ -127,7 +151,8 @@ namespace OpdexGovernanceTests
                 VaultAmount = DefaultVaultSchedule[0],
                 MiningAmount = DefaultMiningSchedule[0],
                 PeriodIndex = 0,
-                TotalSupply = DefaultMiningSchedule[0] + DefaultVaultSchedule[0]
+                TotalSupply = DefaultMiningSchedule[0] + DefaultVaultSchedule[0],
+                NextDistributionBlock = 1_971_100 // blocks per year + block = 1,971,000 + 100
             }, Times.Once);
         }
 
@@ -249,7 +274,8 @@ namespace OpdexGovernanceTests
                 VaultAmount = DefaultVaultSchedule[scheduleIndex],
                 MiningAmount = DefaultMiningSchedule[scheduleIndex],
                 PeriodIndex = periodIndex,
-                TotalSupply = expectedTotalSupply
+                TotalSupply = expectedTotalSupply,
+                NextDistributionBlock = (periodDuration * (periodIndex + 1)) + genesis
             }, Times.Once);
         }
 

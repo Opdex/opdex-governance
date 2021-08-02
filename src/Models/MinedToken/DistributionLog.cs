@@ -6,4 +6,5 @@ public struct DistributionLog
     public UInt256 VaultAmount;
     public UInt256 MiningAmount;
     public UInt256 TotalSupply;
+    public ulong NextDistributionBlock;
 }
