@@ -57,10 +57,9 @@ public interface IOpdexMinedToken : IStandardToken256
     string Name { get; }
 
     /// <summary>
-    /// Retrieves the next block that distribution is available.
+    /// The next block that distribution is available.
     /// </summary>
-    /// <returns>The block height of the next distribution.</returns>
-    ulong NextDistributionBlock();
+    ulong NextDistributionBlock { get; }
 
     /// <summary>
     /// Mints and distributes tokens according to the vault and mining period schedules.
