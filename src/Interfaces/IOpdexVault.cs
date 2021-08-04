@@ -15,7 +15,17 @@ public interface IOpdexVault
     /// <summary>
     /// The vault owner's address.
     /// </summary>
+    /// <remarks>
+    /// The vault owner's privileges include the ability to create and revoke vault certificates and the ability to set a new pending owner that
+    /// will need to claim ownership to accept it.
+    /// </remarks>
     Address Owner { get; }
+
+    /// <summary>
+    /// A pending wallet address that has been suggested to take ownership of the contract. This value
+    /// acts as a whitelist for access to <see cref="ClaimPendingOwnership"/>.
+    /// </summary>
+    Address PendingOwner { get; }
 
     /// <summary>
     /// The total supply of tokens available to be locked in certificates.
@@ -60,8 +70,14 @@ public interface IOpdexVault
     void RevokeCertificates(Address wallet);
 
     /// <summary>
-    /// Updates the current owner of the vault to a new owner address. Only the current owner can set a new owner.
+    /// Public method allowing the current contract owner to whitelist a new pending owner. The newly pending owner
+    /// will then call <see cref="ClaimPendingOwnership"/> to accept.
     /// </summary>
-    /// <param name="owner">Address of the new owner to set.</param>
-    void SetOwner(Address owner);
+    /// <param name="pendingOwner">The address to set as the new pending owner.</param>
+    void SetPendingOwnership(Address pendingOwner);
+
+    /// <summary>
+    /// Public method to allow the pending new owner to accept ownership replacing the current contract owner.
+    /// </summary>
+    void ClaimPendingOwnership();
 }

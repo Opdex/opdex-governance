@@ -14,4 +14,5 @@ public struct TokenStateKeys
     public const string PeriodDuration = "TL";
     public const string Balance = "TM";
     public const string Allowance = "TN";
+    public const string NextDistributionBlock = "TO";
 }

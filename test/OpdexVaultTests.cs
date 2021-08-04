@@ -57,28 +57,68 @@ namespace OpdexGovernanceTests
         #region Set Owner
 
         [Fact]
-        public void SetOwner_Success()
+        public void SetPendingOwnership_Success()
         {
             var vault = CreateNewOpdexVault();
 
-            SetupMessage(ODX, Owner);
+            State.SetAddress(VaultStateKeys.Owner, Owner);
 
-            vault.SetOwner(MiningGovernance);
+            SetupMessage(Vault, Owner);
 
-            vault.Owner.Should().Be(MiningGovernance);
+            vault.SetPendingOwnership(MiningGovernance);
 
-            VerifyLog(new ChangeVaultOwnerLog { From = Owner, To = MiningGovernance }, Times.Once);
+            vault.PendingOwner.Should().Be(MiningGovernance);
+
+            VerifyLog(new SetPendingVaultOwnershipLog { From = Owner, To = MiningGovernance }, Times.Once);
         }
 
         [Fact]
-        public void SetOwner_Throws_Unauthorized()
+        public void SetPendingOwnership_Throws_Unauthorized()
         {
             var vault = CreateNewOpdexVault();
 
             SetupMessage(Vault, Miner);
 
-            vault.Invoking(v => v.SetOwner(MiningGovernance))
-                .Should().Throw<SmartContractAssertException>()
+            vault
+                .Invoking(m => m.SetPendingOwnership(MiningGovernance))
+                .Should()
+                .Throw<SmartContractAssertException>()
+                .WithMessage("OPDEX: UNAUTHORIZED");
+        }
+
+        [Fact]
+        public void ClaimPendingOwnership_Success()
+        {
+            var pendingOwner = MiningGovernance;
+            var vault = CreateNewOpdexVault();
+
+            State.SetAddress(VaultStateKeys.Owner, Owner);
+            State.SetAddress(VaultStateKeys.PendingOwner, pendingOwner);
+
+            SetupMessage(Vault, pendingOwner);
+
+            vault.ClaimPendingOwnership();
+
+            vault.PendingOwner.Should().Be(Address.Zero);
+            vault.Owner.Should().Be(pendingOwner);
+
+            VerifyLog(new ClaimPendingVaultOwnershipLog { From = Owner, To = pendingOwner }, Times.Once);
+        }
+
+        [Fact]
+        public void ClaimPendingOwnership_Throws_Unauthorized()
+        {
+            var vault = CreateNewOpdexVault();
+
+            State.SetAddress(VaultStateKeys.Owner, Owner);
+            State.SetAddress(VaultStateKeys.PendingOwner, MiningGovernance);
+
+            SetupMessage(Vault, Miner);
+
+            vault
+                .Invoking(m => m.ClaimPendingOwnership())
+                .Should()
+                .Throw<SmartContractAssertException>()
                 .WithMessage("OPDEX: UNAUTHORIZED");
         }
 

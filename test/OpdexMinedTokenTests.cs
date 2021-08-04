@@ -95,6 +95,7 @@ namespace OpdexGovernanceTests
         public void DistributeGenesis_Success()
         {
             const ulong block = 100;
+            const ulong expectedNextDistributionBlock = 1_971_100; // blocks per year + block = 1,971,000 + 100
 
             var token = CreateNewOpdexToken(Serializer.Serialize(DefaultVaultSchedule), Serializer.Serialize(DefaultMiningSchedule));
 
@@ -118,6 +119,7 @@ namespace OpdexGovernanceTests
             token.PeriodIndex.Should().Be(1);
             token.TotalSupply.Should().Be(DefaultMiningSchedule[0] + DefaultVaultSchedule[0]);
             token.Genesis.Should().Be(block);
+            token.NextDistributionBlock.Should().Be(expectedNextDistributionBlock);
 
             VerifyCall(MiningGovernance, 0ul, nameof(IOpdexMiningGovernance.NotifyDistribution), governanceCallParams, Times.Once);
             VerifyCall(Vault, 0ul, nameof(IOpdexVault.NotifyDistribution), vaultCallParams, Times.Once);
@@ -126,7 +128,9 @@ namespace OpdexGovernanceTests
             {
                 VaultAmount = DefaultVaultSchedule[0],
                 MiningAmount = DefaultMiningSchedule[0],
-                PeriodIndex = 0
+                PeriodIndex = 0,
+                TotalSupply = DefaultMiningSchedule[0] + DefaultVaultSchedule[0],
+                NextDistributionBlock = expectedNextDistributionBlock
             }, Times.Once);
         }
 
@@ -172,6 +176,24 @@ namespace OpdexGovernanceTests
                 .WithMessage("OPDEX: INVALID_NOMINATION");
         }
 
+        [Fact]
+        public void DistributeGenesis_Throws_DuplicateNomination()
+        {
+            var token = CreateNewOpdexToken(Serializer.Serialize(DefaultVaultSchedule), Serializer.Serialize(DefaultMiningSchedule));
+
+            State.SetContract(Pool1, true);
+            State.SetContract(Pool2, true);
+            State.SetContract(Pool3, true);
+
+            SetupMessage(ODX, Owner);
+
+            token
+                .Invoking(t => t.DistributeGenesis(Pool1, Pool2, Pool3, Pool3))
+                .Should()
+                .Throw<SmartContractAssertException>()
+                .WithMessage("OPDEX: DUPLICATE_NOMINATION");
+        }
+
         #endregion
 
         #region Distribute
@@ -187,6 +209,8 @@ namespace OpdexGovernanceTests
         {
             const ulong genesis = 100;
             const ulong periodDuration = 1000;
+            var currentDistributionBlock = (periodDuration * periodIndex) + genesis;
+            var expectedNextDistributionBlock = (periodDuration * (periodIndex + 1)) + genesis;
 
             var token = CreateNewOpdexToken(Serializer.Serialize(DefaultVaultSchedule), Serializer.Serialize(DefaultMiningSchedule), genesis);
 
@@ -196,6 +220,7 @@ namespace OpdexGovernanceTests
             State.SetUInt64(TokenStateKeys.PeriodDuration, periodDuration);
             State.SetUInt256(TokenStateKeys.TotalSupply, currentTotalSupply);
             State.SetUInt64(TokenStateKeys.Genesis, genesis);
+            State.SetUInt64(TokenStateKeys.NextDistributionBlock, currentDistributionBlock);
 
             var block = (BlocksPerYear * periodIndex) + genesis;
             SetupBlock(block);
@@ -213,6 +238,7 @@ namespace OpdexGovernanceTests
             token.PeriodIndex.Should().Be(periodIndex + 1);
             token.TotalSupply.Should().Be(expectedTotalSupply);
             token.Genesis.Should().Be(genesis);
+            token.NextDistributionBlock.Should().Be(expectedNextDistributionBlock);
 
             var scheduleIndex = periodIndex > (uint) DefaultVaultSchedule.Length - 2
                 ? (uint)DefaultVaultSchedule.Length - 1
@@ -229,7 +255,9 @@ namespace OpdexGovernanceTests
             {
                 VaultAmount = DefaultVaultSchedule[scheduleIndex],
                 MiningAmount = DefaultMiningSchedule[scheduleIndex],
-                PeriodIndex = periodIndex
+                PeriodIndex = periodIndex,
+                TotalSupply = expectedTotalSupply,
+                NextDistributionBlock = expectedNextDistributionBlock
             }, Times.Once);
         }
 
@@ -244,13 +272,16 @@ namespace OpdexGovernanceTests
         public void Distribute_Throws_NotReady(uint periodIndex)
         {
             const ulong genesis = 100;
+            var nextDistributionBlock = (BlocksPerYear * (periodIndex + 1)) + genesis;
+            var currentBlock = nextDistributionBlock - 1;
 
             var token = CreateNewOpdexToken(Serializer.Serialize(DefaultVaultSchedule), Serializer.Serialize(DefaultMiningSchedule), genesis);
 
             State.SetAddress(nameof(MiningGovernance), MiningGovernance);
             State.SetUInt32(TokenStateKeys.PeriodIndex, periodIndex);
+            State.SetUInt64(TokenStateKeys.NextDistributionBlock, nextDistributionBlock);
 
-            SetupBlock(genesis);
+            SetupBlock(currentBlock);
 
             token.Invoking(t => t.Distribute())
                 .Should().Throw<SmartContractAssertException>()
