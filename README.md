@@ -4,8 +4,8 @@ Opdex mined token and governance smart contracts.
 
 View extensive documentation on the Opdex website.
 
-<a href="https://opdex.com/docs" target="_blank">
-https://opdex.com/docs
+<a href="https://docs.opdex.com/docs/governance-overview" target="_blank">
+https://docs.opdex.com
 </a>
 
 ## Compile
