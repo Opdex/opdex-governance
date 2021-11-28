@@ -1,4 +1,3 @@
-using System;
 using Stratis.SmartContracts;
 
 /// <summary>
@@ -6,20 +5,17 @@ using Stratis.SmartContracts;
 /// </summary>
 public class OpdexVault : SmartContract, IOpdexVault
 {
-    private const uint MaximumCertificates = 10;
-
     /// <summary>
     /// Constructor initializing an empty vault for locking tokens to be vested.
     /// </summary>
     /// <param name="state">Smart contract state.</param>
     /// <param name="token">The locked SRC token.</param>
-    /// <param name="owner">The vault owner.</param>
     /// <param name="vestingDuration">The length in blocks of the vesting period.</param>
-    public OpdexVault(ISmartContractState state, Address token, Address owner, ulong vestingDuration) : base(state)
+    public OpdexVault(ISmartContractState state, Address token, ulong vestingDuration) : base(state)
     {
         Token = token;
-        Owner = owner;
         VestingDuration = vestingDuration;
+        Governance = InitializeVaultGovernance();
     }
 
     /// <inheritdoc />
@@ -44,17 +40,10 @@ public class OpdexVault : SmartContract, IOpdexVault
     }
 
     /// <inheritdoc />
-    public Address Owner
+    public Address Governance
     {
-        get => State.GetAddress(VaultStateKeys.Owner);
-        private set => State.SetAddress(VaultStateKeys.Owner, value);
-    }
-
-    /// <inheritdoc />
-    public Address PendingOwner
-    {
-        get => State.GetAddress(VaultStateKeys.PendingOwner);
-        private set => State.SetAddress(VaultStateKeys.PendingOwner, value);
+        get => State.GetAddress(VaultStateKeys.Governance);
+        private set => State.SetAddress(VaultStateKeys.Governance, value);
     }
 
     /// <inheritdoc />
@@ -65,14 +54,14 @@ public class OpdexVault : SmartContract, IOpdexVault
     }
 
     /// <inheritdoc />
-    public VaultCertificate[] GetCertificates(Address wallet)
+    public VaultCertificate GetCertificate(Address wallet)
     {
-        return State.GetArray<VaultCertificate>($"{VaultStateKeys.Certificates}:{wallet}") ?? new VaultCertificate[0];
+        return State.GetStruct<VaultCertificate>($"{VaultStateKeys.Certificate}:{wallet}");
     }
 
-    private void SetCertificates(Address wallet, VaultCertificate[] certificates)
+    private void SetCertificate(Address wallet, VaultCertificate certificate)
     {
-        State.SetArray($"{VaultStateKeys.Certificates}:{wallet}", certificates);
+        State.SetStruct($"{VaultStateKeys.Certificate}:{wallet}", certificate);
     }
 
     /// <inheritdoc />
@@ -88,23 +77,24 @@ public class OpdexVault : SmartContract, IOpdexVault
     /// <inheritdoc />
     public void CreateCertificate(Address to, UInt256 amount)
     {
-        var owner = Owner;
+        var governance = Governance;
         var vestingDuration = VestingDuration;
 
-        Assert(Message.Sender == owner, "OPDEX: UNAUTHORIZED");
-        Assert(to != owner, "OPDEX: INVALID_CERTIFICATE_HOLDER");
+        Assert(Message.Sender == governance, "OPDEX: UNAUTHORIZED");
+        Assert(to != governance, "OPDEX: INVALID_CERTIFICATE_HOLDER");
         Assert(amount > 0 && amount <= TotalSupply, "OPDEX: INVALID_AMOUNT");
+        // Todo: Change in vesting period will lock the vault after, if changing vesting period, adjust logic below
         Assert(Block.Number < Genesis + vestingDuration, "OPDEX: TOKENS_BURNED");
 
-        var certificates = GetCertificates(to);
+        var certificate = GetCertificate(to);
 
-        Assert(certificates.Length < MaximumCertificates, "OPDEX: CERTIFICATE_LIMIT_REACHED");
+        Assert(certificate.Amount == UInt256.Zero, "OPDEX: CERTIFICATE_EXISTS");
 
         var vestedBlock = Block.Number + vestingDuration;
 
-        certificates = InsertCertificate(certificates, amount, vestedBlock, false);
+        certificate = new VaultCertificate { Amount = amount, VestedBlock = vestedBlock, Revoked = false };
 
-        SetCertificates(to, certificates);
+        SetCertificate(to, certificate);
 
         TotalSupply -= amount;
 
@@ -112,96 +102,59 @@ public class OpdexVault : SmartContract, IOpdexVault
     }
 
     /// <inheritdoc />
-    public void RedeemCertificates()
+    public void RedeemCertificate()
     {
-        var certificates = GetCertificates(Message.Sender);
-        var lockedCertificates = new VaultCertificate[0];
-        var amountToTransfer = UInt256.Zero;
+        var certificate = GetCertificate(Message.Sender);
 
-        foreach (var certificate in certificates)
-        {
-            if (certificate.VestedBlock > Block.Number)
-            {
-                lockedCertificates = InsertCertificate(lockedCertificates, certificate.Amount, certificate.VestedBlock, certificate.Revoked);
-                continue;
-            }
+        Assert(certificate.VestedBlock > 0, "OPDEX: CERTIFICATE_NOT_FOUND");
+        Assert(certificate.VestedBlock < Block.Number, "OPDEX: CERTIFICATE_VESTING");
 
-            amountToTransfer += certificate.Amount;
+        var amountToTransfer = certificate.Amount;
 
-            Log(new RedeemVaultCertificateLog {Owner = Message.Sender, Amount = certificate.Amount, VestedBlock = certificate.VestedBlock});
-        }
+        Log(new RedeemVaultCertificateLog {Owner = Message.Sender, Amount = certificate.Amount, VestedBlock = certificate.VestedBlock});
 
-        SetCertificates(Message.Sender, lockedCertificates);
+        SetCertificate(Message.Sender, default(VaultCertificate));
+
         SafeTransferTo(Token, Message.Sender, amountToTransfer);
     }
 
     /// <inheritdoc />
-    public void RevokeCertificates(Address wallet)
+    public void RevokeCertificate(Address wallet)
     {
-        Assert(Message.Sender == Owner, "OPDEX: UNAUTHORIZED");
+        Assert(Message.Sender == Governance, "OPDEX: UNAUTHORIZED");
 
-        var certificates = GetCertificates(wallet);
+        var certificate = GetCertificate(wallet);
+
+        Assert(!certificate.Revoked, "OPDEX: CERTIFICATE_PREVIOUSLY_REVOKED");
+        Assert(certificate.VestedBlock >= Block.Number, "OPDEX: CERTIFICATE_VESTED");
+
         var vestingDuration = VestingDuration;
+        var vestingAmount = certificate.Amount;
+        var vestingBlock = certificate.VestedBlock - vestingDuration;
+        var vestedBlocks = Block.Number - vestingBlock;
 
-        for (var i = 0; i < certificates.Length; i++)
-        {
-            var vestingAmount = certificates[i].Amount;
-            var vestedBlock = certificates[i].VestedBlock;
-            var revoked = certificates[i].Revoked;
+        UInt256 percentageOffset = 100;
 
-            if (revoked || vestedBlock <= Block.Number) continue;
+        var divisor = vestingDuration * percentageOffset / vestedBlocks;
+        var newAmount = vestingAmount * percentageOffset / divisor;
 
-            var vestingBlock = vestedBlock - vestingDuration;
-            var vestedBlocks = Block.Number - vestingBlock;
-            UInt256 percentageOffset = 100;
-            var divisor = vestingDuration * percentageOffset / vestedBlocks;
-            var newAmount = vestingAmount * percentageOffset / divisor;
+        certificate.Amount = newAmount;
+        certificate.Revoked = true;
 
-            certificates[i].Amount = newAmount;
-            certificates[i].Revoked = true;
+        TotalSupply += (vestingAmount - newAmount);
 
-            TotalSupply += (vestingAmount - newAmount);
+        Log(new RevokeVaultCertificateLog {Owner = wallet, OldAmount = vestingAmount, NewAmount = newAmount, VestedBlock = certificate.VestedBlock});
 
-            Log(new RevokeVaultCertificateLog {Owner = wallet, OldAmount = vestingAmount, NewAmount = newAmount, VestedBlock = vestedBlock});
-        }
-
-        SetCertificates(wallet, certificates);
+        SetCertificate(wallet, certificate);
     }
 
-    /// <inheritdoc />
-    public void SetPendingOwnership(Address pendingOwner)
+    private Address InitializeVaultGovernance()
     {
-        Assert(Message.Sender == Owner, "OPDEX: UNAUTHORIZED");
+        var vaultGovernance = Create<OpdexVaultGovernance>(0ul, new object[] { Address });
 
-        PendingOwner = pendingOwner;
+        Assert(vaultGovernance.Success, "OPDEX: INVALID_VAULT_GOVERNANCE");
 
-        Log(new SetPendingVaultOwnershipLog {From = Message.Sender, To = pendingOwner});
-    }
-
-    /// <inheritdoc />
-    public void ClaimPendingOwnership()
-    {
-        var pendingOwner = PendingOwner;
-
-        Assert(Message.Sender == pendingOwner, "OPDEX: UNAUTHORIZED");
-
-        var oldOwner = Owner;
-
-        Owner = pendingOwner;
-        PendingOwner = Address.Zero;
-
-        Log(new ClaimPendingVaultOwnershipLog {From = oldOwner, To = pendingOwner});
-    }
-
-    private static VaultCertificate[] InsertCertificate(VaultCertificate[] certificates, UInt256 amount, ulong vestedBlock, bool revoked)
-    {
-        var originalLength = certificates.Length;
-
-        Array.Resize(ref certificates, originalLength + 1);
-
-        certificates[originalLength] = new VaultCertificate { Amount = amount, VestedBlock = vestedBlock, Revoked = revoked};
-
-        return certificates;
+        return vaultGovernance.NewContractAddress;
     }
 
     private void SafeTransferTo(Address token, Address to, UInt256 amount)

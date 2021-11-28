@@ -330,9 +330,11 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
 
     private Address InitializeVault(ulong periodDuration)
     {
+        // Todo: Consider 1 year lockup
+        // -- Side effects to the Vault contract are commented within should this change be made
         var vestingPeriod = periodDuration * 4;
 
-        var vaultResponse = Create<OpdexVault>(0, new object[] {Address, Message.Sender, vestingPeriod});
+        var vaultResponse = Create<OpdexVault>(0, new object[] {Address, vestingPeriod});
 
         Assert(vaultResponse.Success, "OPDEX: INVALID_VAULT_ADDRESS");
 
