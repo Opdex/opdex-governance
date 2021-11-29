@@ -1,14 +1,22 @@
+// Todo: Consider adding all of this to the existing Vault contract.
+// Todo: Consider limiting number of active proposals to not spread votes thin, maybe 2-4?
+// -- Consider also a first step, min # of CRS pledged to start the real vote. -- Maybe 5k CRS
+// -- Does introduce problematic scenarios with CRS price fluctation.
+// -- Could just Assert in Vote() that the minimum pledge is met
+// -- -- Add a Pledge() method, accept CRS until the final pledge exceeds the minimum threshold
+// -- -- -- When threshold is met, flag proposal, set end block, start the real vote
+// -- -- -- Once the real vote is started, start at 0, pledges will need to withdraw then vote again
+// Todo: Consider a minimum yes vote weight for a proposal to pass
+// -- Maybe 10k - 25k CRS -- introduces complexities with CRS price fluctuation
+
 using Stratis.SmartContracts;
 
-/// Todo: Consider adding all of this to the existing Vault contract.
 /// <summary>
 /// A Governance contract that controls the Opdex Vault and its locked certificates.
 /// </summary>
 public class OpdexVaultGovernance : SmartContract, IOpdexVaultGovernance
 {
-    private const string RevokeProposalType = "Revoke";
-    private const string CreateProposalType = "Create";
-    private const ulong OneWeek = 60 * 60 * 24 * 7 / 16;
+    private const ulong ThreeDayProposal = 60 * 60 * 24 * 3 / 16;
 
     /// <summary>
     /// Constructor to instantiate Opdex Vault Governance contract.
@@ -24,60 +32,64 @@ public class OpdexVaultGovernance : SmartContract, IOpdexVaultGovernance
     /// <inheritdoc />
     public Address Vault
     {
-        get => State.GetAddress(nameof(Vault));
-        private set => State.SetAddress(nameof(Vault), value);
+        get => State.GetAddress(VaultGovernanceStateKeys.Vault);
+        private set => State.SetAddress(VaultGovernanceStateKeys.Vault, value);
     }
 
     /// <inheritdoc />
     public UInt256 NextProposalId
     {
-        get => State.GetUInt256(nameof(NextProposalId));
-        private set => State.SetUInt256(nameof(NextProposalId), value);
+        get => State.GetUInt256(VaultGovernanceStateKeys.NextProposalId);
+        private set => State.SetUInt256(VaultGovernanceStateKeys.NextProposalId, value);
+    }
+
+    /// <inheritdoc />
+    public UInt256 ProposedAmount
+    {
+        get => State.GetUInt256(VaultGovernanceStateKeys.ProposedAmount);
+        private set => State.SetUInt256(VaultGovernanceStateKeys.ProposedAmount, value);
     }
 
     /// <inheritdoc />
     public VaultProposalDetails GetProposal(UInt256 id)
     {
-        return State.GetStruct<VaultProposalDetails>($"Proposal:{id}");
+        return State.GetStruct<VaultProposalDetails>($"{VaultGovernanceStateKeys.Proposal}:{id}");
     }
 
-    private void SetProposal(VaultProposalDetails proposal)
+    private void SetProposal(UInt256 proposalId, VaultProposalDetails proposal)
     {
-        State.SetStruct($"Proposal:{proposal.Id}", proposal);
+        State.SetStruct($"{VaultGovernanceStateKeys.Proposal}:{proposalId}", proposal);
     }
 
     /// <inheritdoc />
     public VaultProposalVote GetProposalVote(UInt256 proposalId, Address voter)
     {
-        return State.GetStruct<VaultProposalVote>($"ProposalVoteWeight:{proposalId}:{voter}");
+        return State.GetStruct<VaultProposalVote>($"{VaultGovernanceStateKeys.ProposalVote}:{proposalId}:{voter}");
     }
 
     private void SetProposalVote(UInt256 proposalId, Address voter, VaultProposalVote vote)
     {
-        State.SetStruct($"ProposalVoteWeight:{proposalId}:{voter}", vote);
+        State.SetStruct($"{VaultGovernanceStateKeys.ProposalVote}:{proposalId}:{voter}", vote);
     }
 
-    // Todo: Consider limiting to 1 proposal at a time
-    // -- Else multiple is fine, but users must spread their CRS to vote for all
-    // -- To enable a re-usable wallet staking balance, would need to limit # of concurrent votes and track
-    // -- -- This would be similar to a "staking balance" however, withdrawal would need to adjust all open proposals
-    // -- -- Tracking all proposals and associated votes to a wallet's staking balance adds a lot of work / logic
-    // Todo: Maybe no revocation with 1 year lockup.
-    // Todo: Maybe make the user enter a ProposalId and validate one doesn't exist
-    // -- The entered proposalId would be the # of a Github PR
-    // -- Would create a repository dedicated to proposals so we can also see history of changes/agreements and comments.
-    // -- Could then remove the proposal string and expect details at the github repo that the UI would pull
     /// <inheritdoc />
-    public void Create(UInt256 amount, string proposal, Address holder, string type)
+    public void Create(UInt256 amount, Address holder, string description, byte type)
     {
-        Assert(type == RevokeProposalType || type == CreateProposalType, "OPDEX: INVALID_PROPOSAL_TYPE");
+        var proposalType = (VaultProposalType)type;
+        var isCreate = proposalType == VaultProposalType.Create;
+        var isRevoke = proposalType == VaultProposalType.Revoke;
+
+        Assert(isCreate || isRevoke, "OPDEX: INVALID_PROPOSAL_TYPE");
+        Assert(description.Length <= 200, "OPDEX: EXCESSIVE_DESCRIPTION");
 
         var certificatesResponse = Call(Vault, 0ul, nameof(IOpdexVault.GetCertificate), new object[] { holder });
         var certificate = (VaultCertificate)certificatesResponse.ReturnValue;
 
-        if (type == RevokeProposalType)
+        if (isRevoke)
         {
-            Assert(!certificate.Revoked && certificate.Amount == amount, "OPDEX: INVALID_REVOKE_PROPOSAL");
+            Assert(!certificate.Revoked &&
+                   certificate.VestedBlock > Block.Number + ThreeDayProposal &&
+                   certificate.Amount == amount, "OPDEX: INVALID_REVOKE_PROPOSAL");
         }
         else
         {
@@ -85,44 +97,39 @@ public class OpdexVaultGovernance : SmartContract, IOpdexVaultGovernance
 
             var supplyResponse = Call(Vault, 0ul, nameof(IOpdexVault.TotalSupply));
             var vaultSupply = (UInt256)supplyResponse.ReturnValue;
+            var proposedAmount = ProposedAmount;
 
-            // Todo: Maybe also track ProposedAmount to Assert that (VaultTotalSupply - ProposedAmount > CreateAmount)
-            // -- Would remove possible overflow of succeeding proposal(s) and amounts w/out sufficient vault supply
+            Assert(supplyResponse.Success &&
+                   vaultSupply > amount &&
+                   vaultSupply - proposedAmount > amount, "OPDEX: INSUFFICIENT_VAULT_SUPPLY");
 
-            Assert(supplyResponse.Success && vaultSupply > amount, "OPDEX: INSUFFICIENT_VAULT_SUPPLY");
+            ProposedAmount = proposedAmount + amount;
         }
 
-        var nextProposalId = NextProposalId;
+        var proposalId = NextProposalId;
+        NextProposalId += 1;
 
         var details = new VaultProposalDetails
         {
-            Amount = amount,
-            Proposal = proposal,
             Holder = holder,
-            CreatedBy = Message.Sender,
-            Id = nextProposalId,
-            Type = type,
-            EndBlock = Block.Number + OneWeek
+            Amount = amount,
+            Description = description, // Todo: Maybe don't persist this to save on gas
+            Type = proposalType,
+            EndBlock = Block.Number + ThreeDayProposal
         };
 
-        SetProposal(details);
+        SetProposal(proposalId, details);
 
         Log(details);
-
-        NextProposalId = nextProposalId + 1;
     }
 
-    // Todo: Consider allowing a vote switch
-    // -- Current implementation requires stacking onto an existing vote, in favor or against
-    // -- In order to switch the vote, users must withdraw from existing, then re-vote
-    // -- Potentially enable a vote switch within the Vote call
     /// <inheritdoc />
     public void Vote(UInt256 proposalId, bool inFavor)
     {
         var proposal = GetProposal(proposalId);
 
+        Assert(proposal.Amount > UInt256.Zero, "OPDEX: INVALID_PROPOSAL");
         Assert(Block.Number <= proposal.EndBlock, "OPDEX: PROPOSAL_CLOSED");
-        Assert(proposal.Id > UInt256.Zero, "OPDEX: INVALID_PROPOSAL");
 
         var proposalVote = GetProposalVote(proposalId, Message.Sender);
         var addedWeight = Message.Value;
@@ -143,6 +150,17 @@ public class OpdexVaultGovernance : SmartContract, IOpdexVaultGovernance
         proposalVote.InFavor = inFavor;
 
         SetProposalVote(proposalId, Message.Sender, proposalVote);
+
+        Log(new VaultProposalVoteLog
+        {
+            ProposalId = proposalId,
+            Voter = Message.Sender,
+            InFavor = inFavor,
+            Weight = addedWeight,
+            TotalVoterWeight = proposalVote.Weight,
+            TotalProposalYesWeight = proposal.YesWeight,
+            TotalProposalNoWeight = proposal.NoWeight
+        });
     }
 
     /// <inheritdoc />
@@ -153,37 +171,59 @@ public class OpdexVaultGovernance : SmartContract, IOpdexVaultGovernance
 
         Assert(amount <= proposalVote.Weight, "OPDEX: INSUFFICIENT_FUNDS");
 
-        // Proposal is in progress, deduct their withdrawn vote
+        // Todo: The proposal is still active, we might want to log and indicate that a vote was withdrawn
+        // -- Would allow clients to index logs and understand the difference between withdrawals
         if (proposal.EndBlock <= Block.Number)
         {
             if (proposalVote.InFavor) proposal.YesWeight -= amount;
             else proposal.NoWeight -= amount;
 
-            SetProposal(proposal);
+            SetProposal(proposalId, proposal);
         }
 
-        proposalVote.Weight -= amount;
+        var remainingVoteWeight = proposalVote.Weight - amount;
+        proposalVote.Weight = remainingVoteWeight;
+
         SetProposalVote(proposalId, Message.Sender, proposalVote);
         Transfer(Message.Sender, amount);
+
+        Log(new VaultProposalVoteWithdrawalLog
+        {
+            ProposalId = proposalId,
+            Voter = Message.Sender,
+            Amount = amount,
+            RemainingAmount = remainingVoteWeight,
+            TotalProposalYesWeight = proposal.YesWeight,
+            TotalProposalNoWeight = proposal.NoWeight
+        });
     }
 
     /// <inheritdoc />
     public void Complete(UInt256 proposalId)
     {
         var proposal = GetProposal(proposalId);
-        if (proposal.Id == UInt256.Zero) return;
 
+        Assert(proposal.Amount > UInt256.Zero, "OPDEX: INVALID_PROPOSAL");
         Assert(proposal.Completed == false, "OPDEX: PROPOSAL_ALREADY_COMPLETE");
         Assert(Block.Number > proposal.EndBlock, "OPDEX: PROPOSAL_IN_PROGRESS");
-        Assert(proposal.YesWeight > proposal.NoWeight, "OPDEX: PROPOSAL_DENIED");
 
-        var response = proposal.Type == RevokeProposalType
-            ? Call(Vault, 0, nameof(IOpdexVault.RevokeCertificate), new object[] { proposal.Holder })
-            : Call(Vault, 0, nameof(IOpdexVault.CreateCertificate), new object[] { proposal.Holder, proposal.Amount });
-
-        Assert(response.Success, "OPDEX: INVALID_PROPOSAL_CERTIFICATION");
+        var approved = proposal.YesWeight > proposal.NoWeight;
 
         proposal.Completed = true;
-        SetProposal(proposal);
+        SetProposal(proposalId, proposal);
+
+        var isRevocation = proposal.Type == VaultProposalType.Revoke;
+        if (!isRevocation) ProposedAmount -= proposal.Amount;
+
+        if (approved)
+        {
+            var response = isRevocation
+                ? Call(Vault, 0, nameof(IOpdexVault.RevokeCertificate), new object[] { proposal.Holder })
+                : Call(Vault, 0, nameof(IOpdexVault.CreateCertificate), new object[] { proposal.Holder, proposal.Amount });
+
+            Assert(response.Success, "OPDEX: INVALID_PROPOSAL_CERTIFICATION");
+        }
+
+        Log(new VaultProposalCompleteLog { ProposalId = proposalId, Approved = approved });
     }
 }

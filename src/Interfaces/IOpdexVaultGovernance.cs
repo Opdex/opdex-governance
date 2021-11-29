@@ -13,6 +13,11 @@ public interface IOpdexVaultGovernance
     UInt256 NextProposalId { get; }
 
     /// <summary>
+    /// The number of tokens requested in active create certificate proposals.
+    /// </summary>
+    UInt256 ProposedAmount { get; }
+
+    /// <summary>
     /// Retrieves proposal details about a specific proposal.
     /// </summary>
     /// <param name="id">The Id number of the requested proposal.</param>
@@ -31,10 +36,10 @@ public interface IOpdexVaultGovernance
     /// Creates a new proposal for a vault certificate to either be created or revoked.
     /// </summary>
     /// <param name="amount">The amount of tokens for a creation proposal.</param>
-    /// <param name="proposal">A short description that includes a Github link to the full proposal.</param>
     /// <param name="holder">The receiving address of the proposed vault certificate.</param>
-    /// <param name="type">The type of proposal to create, "Revoke" or "Create".</param>
-    void Create(UInt256 amount, string proposal, Address holder, string type);
+    /// <param name="description">A short description that includes a Github link to the full proposal.</param>
+    /// <param name="type">The type of proposal to create, Create - 1 or Revoke - 2.</param>
+    void Create(UInt256 amount, Address holder, string description, byte type);
 
     /// <summary>
     /// Votes for or against a proposal by temporarily holding CRS in contract as vote weight.
