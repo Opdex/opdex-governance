@@ -1,11 +1,10 @@
 using Stratis.SmartContracts;
 
-public struct VaultProposalVoteLog
+public struct VaultProposalVoteWithdrawLog
 {
-    [Index] public UInt256 ProposalId;
     [Index] public Address Voter;
-    public bool InFavor;
-    public ulong VoteAmount;
+    [Index] public UInt256 ProposalId;
+    public ulong WithdrawAmount;
     public ulong VoterAmount;
     public ulong ProposalYesAmount;
     public ulong ProposalNoAmount;

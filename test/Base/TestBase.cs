@@ -32,6 +32,9 @@ namespace OpdexGovernanceTests.Base
         protected readonly InMemoryState State;
         protected const ulong BlocksPerYear = 60 * 60 * 24 * 365 / 16;
         protected const ulong BlocksPerMonth = BlocksPerYear / 12;
+        protected const ulong OneDay = 60 * 60 * 24 / 16;
+        protected const ulong ThreeDays = OneDay * 3;
+        protected const ulong OneWeek = OneDay * 7;
 
         protected TestBase()
         {
@@ -46,20 +49,19 @@ namespace OpdexGovernanceTests.Base
             _mockContractState.Setup(x => x.Serializer).Returns(Serializer);
             ODX = "0x0000000000000000000000000000000000000001".HexToAddress();
             MiningGovernance = "0x0000000000000000000000000000000000000002".HexToAddress();
-            VaultGovernance = "0x0000000000000000000000000000000000000003".HexToAddress();
-            MiningPool1 = "0x0000000000000000000000000000000000000004".HexToAddress();
-            MiningPool2 = "0x0000000000000000000000000000000000000005".HexToAddress();
-            MiningPool3 = "0x0000000000000000000000000000000000000006".HexToAddress();
-            MiningPool4 = "0x0000000000000000000000000000000000000007".HexToAddress();
-            MiningPool5 = "0x0000000000000000000000000000000000000008".HexToAddress();
-            Owner = "0x0000000000000000000000000000000000000009".HexToAddress();
-            Miner = "0x0000000000000000000000000000000000000010".HexToAddress();
-            Pool1 = "0x0000000000000000000000000000000000000011".HexToAddress();
-            Pool2 = "0x0000000000000000000000000000000000000012".HexToAddress();
-            Pool3 = "0x0000000000000000000000000000000000000013".HexToAddress();
-            Pool4 = "0x0000000000000000000000000000000000000014".HexToAddress();
-            Pool5 = "0x0000000000000000000000000000000000000015".HexToAddress();
-            Vault = "0x0000000000000000000000000000000000000016".HexToAddress();
+            MiningPool1 = "0x0000000000000000000000000000000000000003".HexToAddress();
+            MiningPool2 = "0x0000000000000000000000000000000000000004".HexToAddress();
+            MiningPool3 = "0x0000000000000000000000000000000000000005".HexToAddress();
+            MiningPool4 = "0x0000000000000000000000000000000000000006".HexToAddress();
+            MiningPool5 = "0x0000000000000000000000000000000000000007".HexToAddress();
+            Owner = "0x0000000000000000000000000000000000000008".HexToAddress();
+            Miner = "0x0000000000000000000000000000000000000009".HexToAddress();
+            Pool1 = "0x0000000000000000000000000000000000000010".HexToAddress();
+            Pool2 = "0x0000000000000000000000000000000000000011".HexToAddress();
+            Pool3 = "0x0000000000000000000000000000000000000012".HexToAddress();
+            Pool4 = "0x0000000000000000000000000000000000000013".HexToAddress();
+            Pool5 = "0x0000000000000000000000000000000000000014".HexToAddress();
+            Vault = "0x0000000000000000000000000000000000000015".HexToAddress();
         }
 
         protected IOpdexMiningGovernance CreateNewOpdexMiningGovernance(ulong block = 10)
@@ -79,9 +81,9 @@ namespace OpdexGovernanceTests.Base
             SetupBalance(0);
             SetupBlock(block);
             SetupCreate<OpdexMiningGovernance>(CreateResult.Succeeded(MiningGovernance), 0ul, new object[] {ODX, BlocksPerMonth});
-            SetupCreate<OpdexVault>(CreateResult.Succeeded(Vault), 0ul, new object[] {ODX, BlocksPerYear * 4});
+            SetupCreate<OpdexVault>(CreateResult.Succeeded(Vault), 0ul, new object[] {ODX, BlocksPerYear, 100ul, 200ul});
 
-            return new OpdexMinedToken(_mockContractState.Object, "Opdex", "ODX", ownerSchedule, miningSchedule, BlocksPerYear);
+            return new OpdexMinedToken(_mockContractState.Object, "Opdex", "ODX", ownerSchedule, miningSchedule, BlocksPerYear, 100, 200);
         }
 
         protected IOpdexVault CreateNewOpdexVault(ulong block = 10)
@@ -90,9 +92,8 @@ namespace OpdexGovernanceTests.Base
 
             SetupBalance(0);
             SetupBlock(block);
-            SetupCreate<OpdexVaultGovernance>(CreateResult.Succeeded(VaultGovernance), 0ul, new object[] {Vault});
 
-            return new OpdexVault(_mockContractState.Object, ODX, BlocksPerYear * 4);
+            return new OpdexVault(_mockContractState.Object, ODX, BlocksPerYear, 100, 200);
         }
 
         protected void SetupMessage(Address contractAddress, Address sender, ulong value = 0)
@@ -120,6 +121,18 @@ namespace OpdexGovernanceTests.Base
                         It.Is<object[]>(p => ValidateParameters(parameters, p)), It.IsAny<ulong>()))
                 .Returns(result)
                 .Callback(() => SetupContractCallMockCallback(amountToTransfer, callback));
+        }
+
+        protected void SetupTransfer(Address to, ulong value, TransferResult result)
+        {
+            _mockInternalExecutor
+                .Setup(x => x.Transfer(_mockContractState.Object, to, value))
+                .Returns(result)
+                .Callback(() =>
+                {
+                    var balance = _mockContractState.Object.GetBalance();
+                    _mockContractState.Setup(x => x.GetBalance).Returns(() => checked(balance - value));
+                });
         }
 
         private void SetupContractCallMockCallback(ulong amountToTransfer, Action callback = null)
