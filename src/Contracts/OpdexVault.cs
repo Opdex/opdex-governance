@@ -141,7 +141,7 @@ public class OpdexVault : SmartContract, IOpdexVault
     /// <inheritdoc />
     public UInt256 CreateNewCertificateProposal(UInt256 amount, Address recipient, string description)
     {
-        ValidateNewProposalBaseDetails(amount, description);
+        ValidateNewProposal(amount, description);
 
         var certificate = GetCertificate(recipient);
 
@@ -153,44 +153,45 @@ public class OpdexVault : SmartContract, IOpdexVault
 
         TotalProposedAmount = proposedAmount + amount;
 
-        return CreateCertificateTypeProposalExecute(recipient, amount, description, ProposalType.Create);
+        return CreateCertificateTypeProposalExecute(recipient, amount, description, (byte)ProposalType.Create);
     }
 
     /// <inheritdoc />
     public UInt256 CreateRevokeCertificateProposal(UInt256 amount, Address recipient, string description)
     {
-        ValidateNewProposalBaseDetails(amount, description);
+        ValidateNewProposal(amount, description);
 
         var certificate = GetCertificate(recipient);
         var maxExpiration = Block.Number + VoteDuration + PledgeDuration;
 
         Assert(!certificate.Revoked && certificate.VestedBlock > maxExpiration && certificate.Amount == amount, "OPDEX: INVALID_CERTIFICATE");
 
-        return CreateCertificateTypeProposalExecute(recipient, amount, description, ProposalType.Revoke);
+        return CreateCertificateTypeProposalExecute(recipient, amount, description, (byte)ProposalType.Revoke);
     }
 
     /// <inheritdoc />
     public UInt256 CreatePledgeMinimumProposal(UInt256 amount, string description)
     {
-        ValidateNewProposalBaseDetails(amount, description);
+        ValidateNewProposal(amount, description);
 
-        return CreateMinimumAmountChangeProposalExecute(amount, description, ProposalType.PledgeMinimum);
+        return CreateMinimumAmountChangeProposalExecute(amount, description, (byte)ProposalType.PledgeMinimum);
     }
 
     /// <inheritdoc />
     public UInt256 CreateProposalMinimumProposal(UInt256 amount, string description)
     {
-        ValidateNewProposalBaseDetails(amount, description);
+        ValidateNewProposal(amount, description);
 
-        return CreateMinimumAmountChangeProposalExecute(amount, description, ProposalType.ProposalMinimum);
+        return CreateMinimumAmountChangeProposalExecute(amount, description, (byte)ProposalType.ProposalMinimum);
     }
 
     /// <inheritdoc />
     public void Pledge(UInt256 proposalId)
     {
         var proposal = GetProposal(proposalId);
+        var proposalStatus = (ProposalStatus)proposal.Status;
 
-        Assert(proposal.Status == ProposalStatus.Pledge, "OPDEX: INVALID_STATUS");
+        Assert(proposalStatus == ProposalStatus.Pledge, "OPDEX: INVALID_STATUS");
         Assert(proposal.Expiration >= Block.Number, "OPDEX: PROPOSAL_EXPIRED");
 
         proposal.PledgeAmount += Message.Value;
@@ -198,7 +199,7 @@ public class OpdexVault : SmartContract, IOpdexVault
         var pledgeMinimumMet = proposal.PledgeAmount >= PledgeMinimum;
         if (proposal.PledgeAmount >= PledgeMinimum)
         {
-            proposal.Status = ProposalStatus.Vote;
+            proposal.Status = (byte)ProposalStatus.Vote;
             proposal.Expiration = Block.Number + VoteDuration;
         }
 
@@ -223,7 +224,7 @@ public class OpdexVault : SmartContract, IOpdexVault
     {
         var proposal = GetProposal(proposalId);
 
-        Assert(proposal.Status == ProposalStatus.Vote, "OPDEX: INVALID_STATUS");
+        Assert((ProposalStatus)proposal.Status == ProposalStatus.Vote, "OPDEX: INVALID_STATUS");
         Assert(proposal.Expiration >= Block.Number, "OPDEX: PROPOSAL_EXPIRED");
 
         var proposalVote = GetProposalVote(proposalId, Message.Sender);
@@ -261,13 +262,15 @@ public class OpdexVault : SmartContract, IOpdexVault
     /// <inheritdoc />
     public void VoteWithdraw(UInt256 proposalId, ulong withdrawAmount)
     {
+        EnsureNotPayable();
         var proposal = GetProposal(proposalId);
+        var proposalStatus = (ProposalStatus)proposal.Status;
         var proposalVote = GetProposalVote(proposalId, Message.Sender);
 
         Assert(withdrawAmount <= proposalVote.Amount, "OPDEX: INSUFFICIENT_FUNDS");
 
         var proposalIsActive = proposal.Expiration >= Block.Number;
-        var voteWithdrawn = proposalIsActive && proposal.Status == ProposalStatus.Vote;
+        var voteWithdrawn = proposalIsActive && proposalStatus == ProposalStatus.Vote;
 
         if (voteWithdrawn)
         {
@@ -294,19 +297,20 @@ public class OpdexVault : SmartContract, IOpdexVault
             VoteWithdrawn = voteWithdrawn
         });
 
-        if (!proposalIsActive && proposal.Status != ProposalStatus.Complete) CompleteProposalExecute(proposalId, proposal);
+        if (!proposalIsActive && proposalStatus != ProposalStatus.Complete) CompleteProposalExecute(proposalId, proposal);
     }
 
     /// <inheritdoc />
     public void PledgeWithdraw(UInt256 proposalId, ulong withdrawAmount)
     {
+        EnsureNotPayable();
         var proposal = GetProposal(proposalId);
         var pledge = GetProposalPledge(proposalId, Message.Sender);
 
         Assert(withdrawAmount <= pledge, "OPDEX: INSUFFICIENT_FUNDS");
 
         var proposalIsActive = proposal.Expiration >= Block.Number;
-        var voteWithdrawn = proposalIsActive && proposal.Status == ProposalStatus.Pledge;
+        var voteWithdrawn = proposalIsActive && (ProposalStatus)proposal.Status == ProposalStatus.Pledge;
 
         if (voteWithdrawn)
         {
@@ -329,16 +333,18 @@ public class OpdexVault : SmartContract, IOpdexVault
             VoteWithdrawn = voteWithdrawn
         });
 
-        if (!proposalIsActive && proposal.Status != ProposalStatus.Complete) CompleteProposalExecute(proposalId, proposal);
+        if (!proposalIsActive && (ProposalStatus)proposal.Status != ProposalStatus.Complete) CompleteProposalExecute(proposalId, proposal);
     }
 
     /// <inheritdoc />
     public void CompleteProposal(UInt256 proposalId)
     {
+        EnsureNotPayable();
         var proposal = GetProposal(proposalId);
+        var proposalStatus = (ProposalStatus)proposal.Status;
 
         Assert(proposal.Expiration > 0, "OPDEX: INVALID_PROPOSAL");
-        Assert(proposal.Status == ProposalStatus.Vote || proposal.Status == ProposalStatus.Pledge, "OPDEX: INVALID_STATUS");
+        Assert(proposalStatus == ProposalStatus.Vote || proposalStatus == ProposalStatus.Pledge, "OPDEX: INVALID_STATUS");
         Assert(Block.Number > proposal.Expiration, "OPDEX: PROPOSAL_IN_PROGRESS");
 
         CompleteProposalExecute(proposalId, proposal);
@@ -347,6 +353,7 @@ public class OpdexVault : SmartContract, IOpdexVault
     /// <inheritdoc />
     public void RedeemCertificate()
     {
+        EnsureNotPayable();
         var certificate = GetCertificate(Message.Sender);
 
         Assert(certificate.VestedBlock > 0, "OPDEX: CERTIFICATE_NOT_FOUND");
@@ -398,7 +405,7 @@ public class OpdexVault : SmartContract, IOpdexVault
         Log(new RevokeVaultCertificateLog {Owner = wallet, OldAmount = vestingAmount, NewAmount = newAmount, VestedBlock = certificate.VestedBlock});
     }
 
-    private UInt256 CreateCertificateTypeProposalExecute(Address recipient, UInt256 amount, string description, ProposalType type)
+    private UInt256 CreateCertificateTypeProposalExecute(Address recipient, UInt256 amount, string description, byte type)
     {
         var existingProposalId = GetCertificateProposalIdByRecipient(recipient);
 
@@ -411,16 +418,16 @@ public class OpdexVault : SmartContract, IOpdexVault
         return proposalId;
     }
 
-    private UInt256 CreateMinimumAmountChangeProposalExecute(UInt256 amount, string description, ProposalType type)
+    private UInt256 CreateMinimumAmountChangeProposalExecute(UInt256 amount, string description, byte type)
     {
         ValidateProposalMinimumChangeAmount(amount);
 
         return CreatProposalExecute(Message.Sender, amount, description, type);
     }
 
-    private UInt256 CreatProposalExecute(Address recipient, UInt256 amount, string description, ProposalType type)
+    private UInt256 CreatProposalExecute(Address recipient, UInt256 amount, string description, byte type)
     {
-        const ProposalStatus status = ProposalStatus.Pledge;
+        const byte status = (byte)ProposalStatus.Pledge;
         var proposalId = NextProposalId;
         var expiration = Block.Number + PledgeDuration;
 
@@ -451,32 +458,34 @@ public class OpdexVault : SmartContract, IOpdexVault
 
     private void CompleteProposalExecute(UInt256 proposalId, ProposalDetails proposal)
     {
+        var proposalType = (ProposalType)proposal.Type;
         var totalVoteAmount = proposal.YesAmount + proposal.NoAmount;
-        var approved = proposal.Status == ProposalStatus.Vote && proposal.YesAmount > proposal.NoAmount && totalVoteAmount >= ProposalMinimum;
+        var approved = (ProposalStatus)proposal.Status == ProposalStatus.Vote && proposal.YesAmount > proposal.NoAmount && totalVoteAmount >= ProposalMinimum;
 
         if (approved)
         {
-            if (proposal.Type == ProposalType.Create) CreateCertificate(proposal.Wallet, proposal.Amount);
-            else if (proposal.Type == ProposalType.Revoke) RevokeCertificate(proposal.Wallet);
-            else if (proposal.Type == ProposalType.PledgeMinimum) PledgeMinimum = (ulong)proposal.Amount;
+            if (proposalType == ProposalType.Create) CreateCertificate(proposal.Wallet, proposal.Amount);
+            else if (proposalType == ProposalType.Revoke) RevokeCertificate(proposal.Wallet);
+            else if (proposalType == ProposalType.PledgeMinimum) PledgeMinimum = (ulong)proposal.Amount;
             else ProposalMinimum = (ulong)proposal.Amount;
         }
 
-        proposal.Status = ProposalStatus.Complete;
+        proposal.Status = (byte)ProposalStatus.Complete;
         SetProposal(proposalId, proposal);
 
-        if (proposal.Type == ProposalType.Create || proposal.Type == ProposalType.Revoke)
+        if (proposalType == ProposalType.Create || proposalType == ProposalType.Revoke)
         {
             SetCertificateProposalIdByRecipient(proposal.Wallet, UInt256.Zero);
 
-            if (proposal.Type == ProposalType.Create) TotalProposedAmount -= proposal.Amount;
+            if (proposalType == ProposalType.Create) TotalProposedAmount -= proposal.Amount;
         }
 
         Log(new CompleteVaultProposalLog { ProposalId = proposalId, Approved = approved });
     }
 
-    private void ValidateNewProposalBaseDetails(UInt256 amount, string description)
+    private void ValidateNewProposal(UInt256 amount, string description)
     {
+        EnsureNotPayable();
         Assert(!string.IsNullOrWhiteSpace(description) && description.Length <= 200, "OPDEX: INVALID_DESCRIPTION");
         Assert(amount > 0, "OPDEX: INVALID_AMOUNT");
     }
@@ -500,5 +509,10 @@ public class OpdexVault : SmartContract, IOpdexVault
         if (amount == 0) return;
 
         Assert(Transfer(to, amount).Success, "OPDEX: INVALID_TRANSFER");
+    }
+
+    private void EnsureNotPayable()
+    {
+        Assert(Message.Value == 0, "OPDEX: NOT_PAYABLE");
     }
 }

@@ -2,11 +2,11 @@ using Stratis.SmartContracts;
 
 public struct CreateVaultProposalLog
 {
-    public UInt256 Id;
+    [Index] public UInt256 Id;
+    [Index] public Address Wallet;
     public UInt256 Amount;
-    public Address Wallet;
-    public ProposalType Type;
-    public ProposalStatus Status;
+    public byte Type;
+    public byte Status;
     public ulong Expiration;
     public string Description;
 }
