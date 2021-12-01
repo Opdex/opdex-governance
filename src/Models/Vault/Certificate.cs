@@ -1,6 +1,6 @@
 using Stratis.SmartContracts;
 
-public struct VaultCertificate
+public struct Certificate
 {
     public UInt256 Amount;
     public ulong VestedBlock;

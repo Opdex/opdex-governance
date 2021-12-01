@@ -1,4 +1,4 @@
-public enum VaultProposalStatus : byte
+public enum ProposalStatus : byte
 {
     Pledge = 0,
     Vote = 1,

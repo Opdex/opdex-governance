@@ -8,4 +8,5 @@ public struct VaultProposalVoteWithdrawLog
     public ulong VoterAmount;
     public ulong ProposalYesAmount;
     public ulong ProposalNoAmount;
+    public bool VoteWithdrawn;
 }

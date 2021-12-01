@@ -1,4 +1,4 @@
-public enum VaultProposalType : byte
+public enum ProposalType : byte
 {
     Create = 1,
     Revoke = 2,

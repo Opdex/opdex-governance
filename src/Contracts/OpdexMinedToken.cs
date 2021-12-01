@@ -16,7 +16,7 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
     /// <param name="vaultDistribution">Serialized UInt256 array of vault distribution amounts.</param>
     /// <param name="miningDistribution">Serialized UInt256 array of mining distribution amounts.</param>
     /// <param name="periodDuration">The number of blocks between token distributions.</param>
-    /// <param name="vaultPledgeMinimum">The minimum total number of token sin satoshis for a proposal to move to a vote.</param>
+    /// <param name="vaultPledgeMinimum">The minimum total number of tokens in satoshis for a proposal to move to a vote.</param>
     /// <param name="vaultProposalMinimum">The minimum total number of tokens in satoshis for a proposal to be valid.</param>
     public OpdexMinedToken(ISmartContractState state, string name, string symbol, byte[] vaultDistribution,
                            byte[] miningDistribution, ulong periodDuration, ulong vaultPledgeMinimum, ulong vaultProposalMinimum) : base(state)

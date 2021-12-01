@@ -1,10 +1,11 @@
 using Stratis.SmartContracts;
 
-public struct VaultProposalPledgeLog
+public struct VaultProposalPledgeWithdrawLog
 {
+    [Index] public Address Voter;
     [Index] public UInt256 ProposalId;
-    [Index] public Address Wallet;
-    public ulong PledgeAmount;
+    public ulong WithdrawAmount;
     public ulong PledgerAmount;
     public ulong ProposalPledgeAmount;
+    public bool VoteWithdrawn;
 }
