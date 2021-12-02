@@ -15,14 +15,14 @@ public class OpdexVault : SmartContract, IOpdexVault
     /// <param name="state">Smart contract state.</param>
     /// <param name="token">The locked SRC token.</param>
     /// <param name="vestingDuration">The length in blocks of the vesting period.</param>
-    /// <param name="pledgeMinimum">The minimum total number of tokens in satoshis for a proposal to move to a vote.</param>
-    /// <param name="proposalMinimum">The minimum total number of tokens in satoshis for a proposal to be valid.</param>
-    public OpdexVault(ISmartContractState state, Address token, ulong vestingDuration, ulong pledgeMinimum, ulong proposalMinimum) : base(state)
+    /// <param name="totalPledgeMinimum">The minimum total number of tokens pledged to a proposal to move to a vote.</param>
+    /// <param name="totalVoteMinimum">The minimum total number of tokens voted on a proposal to have a chance to be approved.</param>
+    public OpdexVault(ISmartContractState state, Address token, ulong vestingDuration, ulong totalPledgeMinimum, ulong totalVoteMinimum) : base(state)
     {
         Token = token;
         VestingDuration = vestingDuration;
-        TotalPledgeMinimum = pledgeMinimum;
-        TotalVoteMinimum = proposalMinimum;
+        TotalPledgeMinimum = totalPledgeMinimum;
+        TotalVoteMinimum = totalVoteMinimum;
         NextProposalId = 1;
     }
 
