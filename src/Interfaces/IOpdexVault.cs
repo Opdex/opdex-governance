@@ -87,7 +87,7 @@ public interface IOpdexVault
     void RedeemCertificate();
 
     /// <summary>
-    /// Creates a new proposal proposing a certificate be created.
+    /// Creates a new proposal for a certificate to be created. If this proposal were to pass, the recipient would receive a certificate that is vested for the <see cref="VestingDuration" />, entitling them to an amount of governance tokens in the vault.
     /// </summary>
     /// <param name="amount">The amount of tokens proposed the recipient's certificate be assigned.</param>
     /// <param name="recipient">The recipient address to assign a certificate to if approved.</param>
@@ -96,7 +96,7 @@ public interface IOpdexVault
     ulong CreateNewCertificateProposal(UInt256 amount, Address recipient, string description);
 
     /// <summary>
-    /// Creates a new proposal proposing a certificate be revoked.
+    /// Creates a new proposal for a certificate to be revoked. If this proposal were to pass, the certificate holder would only be entitled to the governance tokens accrued in the <see cref="VestingDuration" />, up to the block at which the certificate is revoked.
     /// </summary>
     /// <param name="recipient">The recipient of an existing certificate to have revoked.</param>
     /// <param name="description">A description of the proposal, limited to 200 characters, preferably a link.</param>
@@ -104,7 +104,7 @@ public interface IOpdexVault
     ulong CreateRevokeCertificateProposal(Address recipient, string description);
 
     /// <summary>
-    /// Creates a new proposal proposing a new pledge minimum amount of tokens have pledged to move onto a vote.
+    /// Creates a new proposal for a change to the minimum pledge amount. If this proposal were to pass, it would alter the amount of tokens required to pledge to a proposal, so that it can move on to a vote.
     /// </summary>
     /// <param name="amount">The proposed new minimum pledge amount.</param>
     /// <param name="description">A description of the proposal, limited to 200 characters, preferably a link.</param>
@@ -120,7 +120,7 @@ public interface IOpdexVault
     ulong CreateProposalMinimumProposal(UInt256 amount, string description);
 
     /// <summary>
-    /// Pledge for a proposal by temporarily locking CRS tokens to help meet the minimum pledge amount to move to an official vote.
+    /// Pledge for a proposal by temporarily locking CRS tokens to help meet the minimum pledge amount, so that it can move to an official vote.
     /// </summary>
     /// <param name="proposalId">The Id of the proposal to pledge to.</param>
     void Pledge(ulong proposalId);
@@ -140,14 +140,14 @@ public interface IOpdexVault
     void WithdrawVote(ulong proposalId, ulong withdrawAmount);
 
     /// <summary>
-    /// Withdraw CRS tokens from a proposal pledge, removing the pledge if still in progress.
+    /// Withdraws CRS tokens from a proposal pledge, removing the pledge if still in progress.
     /// </summary>
     /// <param name="proposalId">The Id of the proposal to remove a pledge amount from.</param>
     /// <param name="withdrawAmount">The amount to withdraw from a pledge.</param>
     void WithdrawPledge(ulong proposalId, ulong withdrawAmount);
 
     /// <summary>
-    /// Completes a proposal and executes the resulting command within the Vault contract if approved.
+    /// Completes a proposal and executes the resulting command within the vault contract if approved.
     /// </summary>
     /// <param name="proposalId">The Id number of the proposal voted on.</param>
     void CompleteProposal(ulong proposalId);
