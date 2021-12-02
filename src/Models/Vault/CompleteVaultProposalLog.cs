@@ -2,6 +2,6 @@ using Stratis.SmartContracts;
 
 public struct CompleteVaultProposalLog
 {
-    [Index] public UInt256 ProposalId;
+    [Index] public ulong ProposalId;
     public bool Approved;
 }

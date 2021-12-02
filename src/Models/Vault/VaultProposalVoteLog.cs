@@ -2,7 +2,7 @@ using Stratis.SmartContracts;
 
 public struct VaultProposalVoteLog
 {
-    [Index] public UInt256 ProposalId;
+    [Index] public ulong ProposalId;
     [Index] public Address Voter;
     public bool InFavor;
     public ulong VoteAmount;
