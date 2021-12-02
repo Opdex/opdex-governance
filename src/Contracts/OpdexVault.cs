@@ -21,8 +21,8 @@ public class OpdexVault : SmartContract, IOpdexVault
     {
         Token = token;
         VestingDuration = vestingDuration;
-        PledgeMinimum = pledgeMinimum;
-        ProposalMinimum = proposalMinimum;
+        TotalPledgeMinimum = pledgeMinimum;
+        TotalVoteMinimum = proposalMinimum;
         NextProposalId = 1;
     }
 
@@ -62,17 +62,17 @@ public class OpdexVault : SmartContract, IOpdexVault
     }
 
     /// <inheritdoc />
-    public ulong PledgeMinimum
+    public ulong TotalPledgeMinimum
     {
-        get => State.GetUInt64(VaultStateKeys.PledgeMinimum);
-        private set => State.SetUInt64(VaultStateKeys.PledgeMinimum, value);
+        get => State.GetUInt64(VaultStateKeys.TotalPledgeMinimum);
+        private set => State.SetUInt64(VaultStateKeys.TotalPledgeMinimum, value);
     }
 
     /// <inheritdoc />
-    public ulong ProposalMinimum
+    public ulong TotalVoteMinimum
     {
-        get => State.GetUInt64(VaultStateKeys.ProposalMinimum);
-        private set => State.SetUInt64(VaultStateKeys.ProposalMinimum, value);
+        get => State.GetUInt64(VaultStateKeys.TotalVoteMinimum);
+        private set => State.SetUInt64(VaultStateKeys.TotalVoteMinimum, value);
     }
 
     /// <inheritdoc />
@@ -168,17 +168,17 @@ public class OpdexVault : SmartContract, IOpdexVault
     }
 
     /// <inheritdoc />
-    public ulong CreatePledgeMinimumProposal(UInt256 amount, string description)
+    public ulong CreateTotalPledgeMinimumProposal(UInt256 amount, string description)
     {
         ValidateProposal(amount, description);
-        return CreateMinimumAmountChangeProposalExecute(amount, description, (byte)ProposalType.PledgeMinimum);
+        return CreateMinimumAmountChangeProposalExecute(amount, description, (byte)ProposalType.TotalPledgeMinimum);
     }
 
     /// <inheritdoc />
-    public ulong CreateProposalMinimumProposal(UInt256 amount, string description)
+    public ulong CreateTotalVoteMinimumProposal(UInt256 amount, string description)
     {
         ValidateProposal(amount, description);
-        return CreateMinimumAmountChangeProposalExecute(amount, description, (byte)ProposalType.ProposalMinimum);
+        return CreateMinimumAmountChangeProposalExecute(amount, description, (byte)ProposalType.TotalVoteMinimum);
     }
 
     /// <inheritdoc />
@@ -194,7 +194,7 @@ public class OpdexVault : SmartContract, IOpdexVault
 
         proposal.PledgeAmount += Message.Value;
 
-        var pledgeMinimumMet = proposal.PledgeAmount >= PledgeMinimum;
+        var pledgeMinimumMet = proposal.PledgeAmount >= TotalPledgeMinimum;
         if (pledgeMinimumMet)
         {
             proposal.Status = (byte)ProposalStatus.Vote;
@@ -213,7 +213,7 @@ public class OpdexVault : SmartContract, IOpdexVault
             PledgeAmount = Message.Value,
             PledgerAmount = totalWalletPledgedAmount,
             ProposalPledgeAmount = proposal.PledgeAmount,
-            PledgeMinimumMet = pledgeMinimumMet
+            TotalPledgeMinimumMet = pledgeMinimumMet
         });
     }
 
@@ -407,7 +407,7 @@ public class OpdexVault : SmartContract, IOpdexVault
 
     private ulong CreateMinimumAmountChangeProposalExecute(UInt256 amount, string description, byte type)
     {
-        ValidateProposalMinimumChangeAmount(amount);
+        Assert(amount <= ulong.MaxValue, "OPDEX: EXCESSIVE_AMOUNT");
         return CreateProposalExecute(Message.Sender, amount, description, type);
     }
 
@@ -446,14 +446,14 @@ public class OpdexVault : SmartContract, IOpdexVault
     {
         var proposalType = (ProposalType)proposal.Type;
         var totalVoteAmount = proposal.YesAmount + proposal.NoAmount;
-        var approved = (ProposalStatus)proposal.Status == ProposalStatus.Vote && proposal.YesAmount > proposal.NoAmount && totalVoteAmount >= ProposalMinimum;
+        var approved = (ProposalStatus)proposal.Status == ProposalStatus.Vote && proposal.YesAmount > proposal.NoAmount && totalVoteAmount >= TotalVoteMinimum;
 
         if (approved)
         {
             if (proposalType == ProposalType.Create) CreateCertificate(proposal.Wallet, proposal.Amount);
             else if (proposalType == ProposalType.Revoke) RevokeCertificate(proposal.Wallet);
-            else if (proposalType == ProposalType.PledgeMinimum) PledgeMinimum = (ulong)proposal.Amount;
-            else ProposalMinimum = (ulong)proposal.Amount;
+            else if (proposalType == ProposalType.TotalPledgeMinimum) TotalPledgeMinimum = (ulong)proposal.Amount;
+            else TotalVoteMinimum = (ulong)proposal.Amount;
         }
 
         proposal.Status = (byte)ProposalStatus.Complete;
@@ -475,8 +475,6 @@ public class OpdexVault : SmartContract, IOpdexVault
         Assert(!string.IsNullOrWhiteSpace(description) && description.Length <= 200, "OPDEX: INVALID_DESCRIPTION");
         Assert(amount > 0, "OPDEX: INVALID_AMOUNT");
     }
-
-    private void ValidateProposalMinimumChangeAmount(UInt256 amount) => Assert(amount <= ulong.MaxValue, "OPDEX: EXCESSIVE_AMOUNT");
 
     private void SafeTransferTo(Address token, Address to, UInt256 amount)
     {

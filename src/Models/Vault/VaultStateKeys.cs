@@ -9,7 +9,7 @@ public struct VaultStateKeys
     public const string Proposal = "VG";
     public const string ProposalVote = "VH";
     public const string ProposalPledge = "VI";
-    public const string PledgeMinimum = "VJ";
-    public const string ProposalMinimum = "VK";
+    public const string TotalPledgeMinimum = "VJ";
+    public const string TotalVoteMinimum = "VK";
     public const string ProposalIdByRecipient = "VL";
 }

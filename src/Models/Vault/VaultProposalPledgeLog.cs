@@ -7,5 +7,5 @@ public struct VaultProposalPledgeLog
     public ulong PledgeAmount;
     public ulong PledgerAmount;
     public ulong ProposalPledgeAmount;
-    public bool PledgeMinimumMet;
+    public bool TotalPledgeMinimumMet;
 }

@@ -28,14 +28,14 @@ public interface IOpdexVault
     UInt256 TotalProposedAmount { get; }
 
     /// <summary>
-    /// The total, minimum number of CRS tokens required for a proposal to move onto a vote.
+    /// The minimum number of CRS tokens required to pledge to move a proposal on to a vote.
     /// </summary>
-    ulong PledgeMinimum { get; }
+    ulong TotalPledgeMinimum { get; }
 
     /// <summary>
-    /// The total, minimum number of CRS tokens required for a proposal to pass.
+    /// The minimum number of CRS tokens required to vote on a proposal to have a chance to pass.
     /// </summary>
-    ulong ProposalMinimum { get; }
+    ulong TotalVoteMinimum { get; }
 
     /// <summary>
     /// Retrieves a certificate a given address is assigned.
@@ -104,20 +104,20 @@ public interface IOpdexVault
     ulong CreateRevokeCertificateProposal(Address recipient, string description);
 
     /// <summary>
-    /// Creates a new proposal for a change to the minimum pledge amount. If this proposal were to pass, it would alter the amount of tokens required to pledge to a proposal, so that it can move on to a vote.
+    /// Creates a new proposal for a change to the minimum pledge total amount. If this proposal were to pass, it would alter the total amount of tokens required to pledge to a proposal, so that it can move on to a vote.
     /// </summary>
-    /// <param name="amount">The proposed new minimum pledge amount.</param>
+    /// <param name="amount">The proposed new total pledge minimum amount.</param>
     /// <param name="description">A description of the proposal, limited to 200 characters, preferably a link.</param>
     /// <returns>The Id of the generated proposal.</returns>
-    ulong CreatePledgeMinimumProposal(UInt256 amount, string description);
+    ulong CreateTotalPledgeMinimumProposal(UInt256 amount, string description);
 
     /// <summary>
-    /// Creates a new proposal proposing a new proposal minimum amount of tokens have voted to be considered for approval.
+    /// Creates a new proposal for a change to the minimum vote total amount. If this proposal were to pass, it would alter the total amount of tokens required to vote on a proposal, so that it can have a chance to pass.
     /// </summary>
-    /// <param name="amount">The proposed new minimum proposal amount.</param>
+    /// <param name="amount">The proposed new total vote minimum amount.</param>
     /// <param name="description">A description of the proposal, limited to 200 characters, preferably a link.</param>
     /// <returns>The Id of the generated proposal.</returns>
-    ulong CreateProposalMinimumProposal(UInt256 amount, string description);
+    ulong CreateTotalVoteMinimumProposal(UInt256 amount, string description);
 
     /// <summary>
     /// Pledge for a proposal by temporarily locking CRS tokens to help meet the minimum pledge amount, so that it can move to an official vote.

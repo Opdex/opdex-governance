@@ -15,8 +15,8 @@ namespace OpdexGovernanceTests
             var vault = CreateNewOpdexVault();
 
             vault.Token.Should().Be(ODX);
-            vault.PledgeMinimum.Should().Be(100ul);
-            vault.ProposalMinimum.Should().Be(200ul);
+            vault.TotalPledgeMinimum.Should().Be(100ul);
+            vault.TotalVoteMinimum.Should().Be(200ul);
             vault.VestingDuration.Should().Be(BlocksPerYear);
             vault.NextProposalId.Should().Be(1ul);
         }
@@ -167,13 +167,13 @@ namespace OpdexGovernanceTests
                 .WithMessage("OPDEX: INVALID_DESCRIPTION");
 
             vault
-                .Invoking(v => v.CreatePledgeMinimumProposal(amount, description))
+                .Invoking(v => v.CreateTotalPledgeMinimumProposal(amount, description))
                 .Should()
                 .Throw<SmartContractAssertException>()
                 .WithMessage("OPDEX: INVALID_DESCRIPTION");
 
             vault
-                .Invoking(v => v.CreateProposalMinimumProposal(amount, description))
+                .Invoking(v => v.CreateTotalVoteMinimumProposal(amount, description))
                 .Should()
                 .Throw<SmartContractAssertException>()
                 .WithMessage("OPDEX: INVALID_DESCRIPTION");
@@ -207,13 +207,13 @@ namespace OpdexGovernanceTests
                 .WithMessage("OPDEX: INVALID_AMOUNT");
 
             vault
-                .Invoking(v => v.CreatePledgeMinimumProposal(amount, description))
+                .Invoking(v => v.CreateTotalPledgeMinimumProposal(amount, description))
                 .Should()
                 .Throw<SmartContractAssertException>()
                 .WithMessage("OPDEX: INVALID_AMOUNT");
 
             vault
-                .Invoking(v => v.CreateProposalMinimumProposal(amount, description))
+                .Invoking(v => v.CreateTotalVoteMinimumProposal(amount, description))
                 .Should()
                 .Throw<SmartContractAssertException>()
                 .WithMessage("OPDEX: INVALID_AMOUNT");
@@ -247,13 +247,13 @@ namespace OpdexGovernanceTests
                 .WithMessage("OPDEX: NOT_PAYABLE");
 
             vault
-                .Invoking(v => v.CreatePledgeMinimumProposal(amount, description))
+                .Invoking(v => v.CreateTotalPledgeMinimumProposal(amount, description))
                 .Should()
                 .Throw<SmartContractAssertException>()
                 .WithMessage("OPDEX: NOT_PAYABLE");
 
             vault
-                .Invoking(v => v.CreateProposalMinimumProposal(amount, description))
+                .Invoking(v => v.CreateTotalVoteMinimumProposal(amount, description))
                 .Should()
                 .Throw<SmartContractAssertException>()
                 .WithMessage("OPDEX: NOT_PAYABLE");
@@ -456,11 +456,11 @@ namespace OpdexGovernanceTests
         }
 
         [Fact]
-        public void PledgeMinimumProposal_Success()
+        public void TotalPledgeMinimumProposal_Success()
         {
             const ulong block = 1000;
             const string description = "change pledge minimum.";
-            const byte type = (byte)ProposalType.PledgeMinimum;
+            const byte type = (byte)ProposalType.TotalPledgeMinimum;
             const byte status = (byte)ProposalStatus.Pledge;
             UInt256 amount = 100;
             const ulong expectedProposalId = 1;
@@ -479,7 +479,7 @@ namespace OpdexGovernanceTests
 
             SetupMessage(Vault, Miner);
 
-            var proposalId = vault.CreatePledgeMinimumProposal(amount, description);
+            var proposalId = vault.CreateTotalPledgeMinimumProposal(amount, description);
 
             proposalId.Should().Be(expectedProposalId);
             vault.NextProposalId.Should().Be(expectedProposalId + 1);
@@ -499,7 +499,7 @@ namespace OpdexGovernanceTests
         }
 
         [Fact]
-        public void PledgeMinimumProposal_Throws_InvalidAmount()
+        public void TotalPledgeMinimumProposal_Throws_InvalidAmount()
         {
             const ulong block = 1000;
             const string description = "change pledge minimum.";
@@ -508,18 +508,18 @@ namespace OpdexGovernanceTests
             var vault = CreateNewOpdexVault(block);
 
             vault
-                .Invoking(v => v.CreatePledgeMinimumProposal(minimumAmountRequest, description))
+                .Invoking(v => v.CreateTotalPledgeMinimumProposal(minimumAmountRequest, description))
                 .Should()
                 .Throw<SmartContractAssertException>()
                 .WithMessage("OPDEX: EXCESSIVE_AMOUNT");
         }
 
         [Fact]
-        public void ProposalMinimumProposal_Success()
+        public void TotalVoteMinimumProposal_Success()
         {
             const ulong block = 1000;
             const string description = "change proposal minimum.";
-            const byte type = (byte)ProposalType.ProposalMinimum;
+            const byte type = (byte)ProposalType.TotalVoteMinimum;
             const byte status = (byte)ProposalStatus.Pledge;
             UInt256 amount = 100;
             const ulong expectedProposalId = 1;
@@ -539,7 +539,7 @@ namespace OpdexGovernanceTests
 
             SetupMessage(Vault, Miner);
 
-            var proposalId = vault.CreateProposalMinimumProposal(amount, description);
+            var proposalId = vault.CreateTotalVoteMinimumProposal(amount, description);
 
             proposalId.Should().Be(expectedProposalId);
             vault.NextProposalId.Should().Be(expectedProposalId + 1);
@@ -559,7 +559,7 @@ namespace OpdexGovernanceTests
         }
 
         [Fact]
-        public void ProposalMinimumProposal_Throws_InvalidAmount()
+        public void TotalVoteMinimumProposal_Throws_InvalidAmount()
         {
             const ulong block = 1000;
             const string description = "change proposal minimum.";
@@ -567,7 +567,7 @@ namespace OpdexGovernanceTests
             var vault = CreateNewOpdexVault(block);
 
             vault
-                .Invoking(v => v.CreateProposalMinimumProposal(minimumAmountRequest, description))
+                .Invoking(v => v.CreateTotalVoteMinimumProposal(minimumAmountRequest, description))
                 .Should()
                 .Throw<SmartContractAssertException>()
                 .WithMessage("OPDEX: EXCESSIVE_AMOUNT");
@@ -606,7 +606,7 @@ namespace OpdexGovernanceTests
 
             State.SetUInt64($"{VaultStateKeys.ProposalPledge}:{proposalId}:{Miner}", currentWalletPledgeAmount);
             State.SetStruct($"{VaultStateKeys.Proposal}:{proposalId}", proposal);
-            State.SetUInt64(VaultStateKeys.PledgeMinimum, minimumProposalPledgeAmount);
+            State.SetUInt64(VaultStateKeys.TotalPledgeMinimum, minimumProposalPledgeAmount);
 
             vault.Pledge(proposalId);
 
@@ -625,7 +625,7 @@ namespace OpdexGovernanceTests
                 PledgeAmount = pledgeAmount,
                 PledgerAmount = expectedWalletPledgeAmount,
                 ProposalPledgeAmount = expectedProposalPledgeAmount,
-                PledgeMinimumMet = minimumMet
+                TotalPledgeMinimumMet = minimumMet
             }, Times.Once);
         }
 
@@ -748,7 +748,7 @@ namespace OpdexGovernanceTests
             {
                 Amount = 100,
                 Wallet = Miner,
-                Type = (byte)ProposalType.PledgeMinimum,
+                Type = (byte)ProposalType.TotalPledgeMinimum,
                 Status = (byte)status,
                 Expiration = pledgeExpiration,
                 YesAmount = 0,
@@ -792,7 +792,7 @@ namespace OpdexGovernanceTests
             if (!proposalIsActive && status != ProposalStatus.Complete)
             {
                 VerifyLog(new CompleteVaultProposalLog { ProposalId = proposalId, Approved = false }, Times.Once);
-                vault.PledgeMinimum.Should().Be((ulong)proposal.Amount);
+                vault.TotalPledgeMinimum.Should().Be((ulong)proposal.Amount);
             }
             else
             {
@@ -1090,7 +1090,7 @@ namespace OpdexGovernanceTests
             {
                 Amount = 100,
                 Wallet = Miner,
-                Type = (byte)ProposalType.ProposalMinimum,
+                Type = (byte)ProposalType.TotalVoteMinimum,
                 Status = (byte)status,
                 Expiration = voteExpiration,
                 YesAmount = currentYesAmount,
@@ -1142,7 +1142,7 @@ namespace OpdexGovernanceTests
             if (!proposalIsActive && status != ProposalStatus.Complete)
             {
                 VerifyLog(new CompleteVaultProposalLog { ProposalId = proposalId, Approved = false }, Times.Once);
-                vault.PledgeMinimum.Should().Be((ulong)proposal.Amount);
+                vault.TotalPledgeMinimum.Should().Be((ulong)proposal.Amount);
             }
             else
             {
@@ -1568,18 +1568,18 @@ namespace OpdexGovernanceTests
         }
 
         [Fact]
-        public void CompleteProposal_PledgeMinimum_Approved_Success()
+        public void CompleteProposal_TotalPledgeMinimum_Approved_Success()
         {
             const ulong proposalId = 1;
             const ulong block = 100;
-            UInt256 requestedPledgeMinimum = 50;
-            const ulong currentPledgeMinimum = 100;
+            UInt256 requestedTotalPledgeMinimum = 50;
+            const ulong currentTotalPledgeMinimum = 100;
 
             var proposal = new ProposalDetails
             {
-                Amount = requestedPledgeMinimum,
+                Amount = requestedTotalPledgeMinimum,
                 Wallet = Miner,
-                Type = (byte)ProposalType.PledgeMinimum,
+                Type = (byte)ProposalType.TotalPledgeMinimum,
                 Status = (byte)ProposalStatus.Vote,
                 Expiration = block - 1,
                 YesAmount = 103,
@@ -1592,14 +1592,14 @@ namespace OpdexGovernanceTests
             SetupMessage(Vault, Miner);
 
             State.SetStruct($"{VaultStateKeys.Proposal}:{proposalId}", proposal);
-            State.SetUInt64(VaultStateKeys.PledgeMinimum, currentPledgeMinimum);
+            State.SetUInt64(VaultStateKeys.TotalPledgeMinimum, currentTotalPledgeMinimum);
 
             vault.CompleteProposal(proposalId);
 
             var proposalResult = vault.GetProposal(proposalId);
             proposalResult.Status.Should().Be((byte)ProposalStatus.Complete);
 
-            vault.PledgeMinimum.Should().Be((ulong)requestedPledgeMinimum);
+            vault.TotalPledgeMinimum.Should().Be((ulong)requestedTotalPledgeMinimum);
 
             VerifyLog(new CompleteVaultProposalLog { ProposalId = proposalId, Approved = true }, Times.Once);
         }
@@ -1607,18 +1607,18 @@ namespace OpdexGovernanceTests
         [Theory]
         [InlineData(ProposalStatus.Pledge)]
         [InlineData(ProposalStatus.Vote)]
-        public void CompleteProposal_PledgeMinimum_NotApproved_Success(ProposalStatus status)
+        public void CompleteProposal_TotalPledgeMinimum_NotApproved_Success(ProposalStatus status)
         {
             const ulong proposalId = 1;
             const ulong block = 100;
-            UInt256 requestedPledgeMinimum = 50;
+            UInt256 requestedTotalPledgeMinimum = 50;
             const ulong pledgeMinimum = 100;
 
             var proposal = new ProposalDetails
             {
-                Amount = requestedPledgeMinimum,
+                Amount = requestedTotalPledgeMinimum,
                 Wallet = Miner,
-                Type = (byte)ProposalType.PledgeMinimum,
+                Type = (byte)ProposalType.TotalPledgeMinimum,
                 Status = (byte)status,
                 Expiration = block - 1,
                 YesAmount = 1,
@@ -1631,31 +1631,31 @@ namespace OpdexGovernanceTests
             SetupMessage(Vault, Miner);
 
             State.SetStruct($"{VaultStateKeys.Proposal}:{proposalId}", proposal);
-            State.SetUInt64(VaultStateKeys.PledgeMinimum, pledgeMinimum);
+            State.SetUInt64(VaultStateKeys.TotalPledgeMinimum, pledgeMinimum);
 
             vault.CompleteProposal(proposalId);
 
             var proposalResult = vault.GetProposal(proposalId);
             proposalResult.Status.Should().Be((byte)ProposalStatus.Complete);
 
-            vault.PledgeMinimum.Should().Be(pledgeMinimum);
+            vault.TotalPledgeMinimum.Should().Be(pledgeMinimum);
 
             VerifyLog(new CompleteVaultProposalLog { ProposalId = proposalId, Approved = false }, Times.Once);
         }
 
         [Fact]
-        public void CompleteProposal_ProposalMinimum_Approved_Success()
+        public void CompleteProposal_TotalVoteMinimum_Approved_Success()
         {
             const ulong proposalId = 1;
             const ulong block = 100;
             const ulong minimumProposalAmount = 100;
-            UInt256 requestedProposalMinimum = 50;
+            UInt256 requestedTotalVoteMinimum = 50;
 
             var proposal = new ProposalDetails
             {
-                Amount = requestedProposalMinimum,
+                Amount = requestedTotalVoteMinimum,
                 Wallet = Miner,
-                Type = (byte)ProposalType.ProposalMinimum,
+                Type = (byte)ProposalType.TotalVoteMinimum,
                 Status = (byte)ProposalStatus.Vote,
                 Expiration = block - 1,
                 YesAmount = 100,
@@ -1668,14 +1668,14 @@ namespace OpdexGovernanceTests
             SetupMessage(Vault, Miner);
 
             State.SetStruct($"{VaultStateKeys.Proposal}:{proposalId}", proposal);
-            State.SetUInt64(VaultStateKeys.ProposalMinimum, minimumProposalAmount);
+            State.SetUInt64(VaultStateKeys.TotalVoteMinimum, minimumProposalAmount);
 
             vault.CompleteProposal(proposalId);
 
             var proposalResult = vault.GetProposal(proposalId);
             proposalResult.Status.Should().Be((byte)ProposalStatus.Complete);
 
-            vault.ProposalMinimum.Should().Be((ulong)requestedProposalMinimum);
+            vault.TotalVoteMinimum.Should().Be((ulong)requestedTotalVoteMinimum);
 
             VerifyLog(new CompleteVaultProposalLog { ProposalId = proposalId, Approved = true }, Times.Once);
         }
@@ -1683,18 +1683,18 @@ namespace OpdexGovernanceTests
         [Theory]
         [InlineData(ProposalStatus.Pledge)]
         [InlineData(ProposalStatus.Vote)]
-        public void CompleteProposal_ProposalMinimum_NotApproved_Success(ProposalStatus status)
+        public void CompleteProposal_TotalVoteMinimum_NotApproved_Success(ProposalStatus status)
         {
             const ulong proposalId = 1;
             const ulong block = 100;
             const ulong minimumProposalAmount = 100;
-            UInt256 requestedProposalMinimum = 50;
+            UInt256 requestedTotalVoteMinimum = 50;
 
             var proposal = new ProposalDetails
             {
-                Amount = requestedProposalMinimum,
+                Amount = requestedTotalVoteMinimum,
                 Wallet = Miner,
-                Type = (byte)ProposalType.ProposalMinimum,
+                Type = (byte)ProposalType.TotalVoteMinimum,
                 Status = (byte)status,
                 Expiration = block - 1,
                 YesAmount = 1,
@@ -1707,14 +1707,14 @@ namespace OpdexGovernanceTests
             SetupMessage(Vault, Miner);
 
             State.SetStruct($"{VaultStateKeys.Proposal}:{proposalId}", proposal);
-            State.SetUInt64(VaultStateKeys.ProposalMinimum, minimumProposalAmount);
+            State.SetUInt64(VaultStateKeys.TotalVoteMinimum, minimumProposalAmount);
 
             vault.CompleteProposal(proposalId);
 
             var proposalResult = vault.GetProposal(proposalId);
             proposalResult.Status.Should().Be((byte)ProposalStatus.Complete);
 
-            vault.ProposalMinimum.Should().Be(minimumProposalAmount);
+            vault.TotalVoteMinimum.Should().Be(minimumProposalAmount);
 
             VerifyLog(new CompleteVaultProposalLog { ProposalId = proposalId, Approved = false }, Times.Once);
         }
