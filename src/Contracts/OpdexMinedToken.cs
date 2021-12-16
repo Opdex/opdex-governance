@@ -16,8 +16,10 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
     /// <param name="vaultDistribution">Serialized UInt256 array of vault distribution amounts.</param>
     /// <param name="miningDistribution">Serialized UInt256 array of mining distribution amounts.</param>
     /// <param name="periodDuration">The number of blocks between token distributions.</param>
+    /// <param name="vaultTotalPledgeMinimum">The minimum total number of tokens pledged to a proposal to move to a vote.</param>
+    /// <param name="vaultTotalVoteMinimum">The minimum total number of tokens voted on a proposal to have a chance to be approved.</param>
     public OpdexMinedToken(ISmartContractState state, string name, string symbol, byte[] vaultDistribution,
-                           byte[] miningDistribution, ulong periodDuration) : base(state)
+                           byte[] miningDistribution, ulong periodDuration, ulong vaultTotalPledgeMinimum, ulong vaultTotalVoteMinimum) : base(state)
     {
         var vaultSchedule = Serializer.ToArray<UInt256>(vaultDistribution);
         var miningSchedule = Serializer.ToArray<UInt256>(miningDistribution);
@@ -32,7 +34,7 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
         MiningSchedule = miningSchedule;
         PeriodDuration = periodDuration;
         MiningGovernance = InitializeMiningGovernance(periodDuration);
-        Vault = InitializeVault(periodDuration);
+        Vault = InitializeVault(periodDuration, vaultTotalPledgeMinimum, vaultTotalVoteMinimum);
     }
 
     /// <inheritdoc />
@@ -328,11 +330,9 @@ public class OpdexMinedToken : SmartContract, IOpdexMinedToken
         return miningGovernanceResponse.NewContractAddress;
     }
 
-    private Address InitializeVault(ulong periodDuration)
+    private Address InitializeVault(ulong periodDuration, ulong vaultTotalPledgeMinimum, ulong vaultTotalVoteMinimum)
     {
-        var vestingPeriod = periodDuration * 4;
-
-        var vaultResponse = Create<OpdexVault>(0, new object[] {Address, Message.Sender, vestingPeriod});
+        var vaultResponse = Create<OpdexVault>(0, new object[] { Address, periodDuration, vaultTotalPledgeMinimum, vaultTotalVoteMinimum });
 
         Assert(vaultResponse.Success, "OPDEX: INVALID_VAULT_ADDRESS");
 

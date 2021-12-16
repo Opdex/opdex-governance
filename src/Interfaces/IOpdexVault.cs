@@ -3,32 +3,12 @@ using Stratis.SmartContracts;
 public interface IOpdexVault
 {
     /// <summary>
-    /// The genesis block at the time it first received tokens.
-    /// </summary>
-    ulong Genesis { get; }
-
-    /// <summary>
     /// The SRC token the vault is responsible for locking.
     /// </summary>
     Address Token { get; }
 
     /// <summary>
-    /// The vault owner's address.
-    /// </summary>
-    /// <remarks>
-    /// The vault owner's privileges include the ability to create and revoke vault certificates and the ability to set a new pending owner that
-    /// will need to claim ownership to accept it.
-    /// </remarks>
-    Address Owner { get; }
-
-    /// <summary>
-    /// A pending wallet address that has been suggested to take ownership of the contract. This value
-    /// acts as a whitelist for access to <see cref="ClaimPendingOwnership"/>.
-    /// </summary>
-    Address PendingOwner { get; }
-
-    /// <summary>
-    /// The total supply of tokens available to be locked in certificates.
+    /// The total supply of tokens available to be assigned to certificates.
     /// </summary>
     UInt256 TotalSupply { get; }
 
@@ -38,11 +18,62 @@ public interface IOpdexVault
     ulong VestingDuration { get; }
 
     /// <summary>
-    /// Retrieves a list of certificates a given address holds.
+    /// The Id of the next proposal to be created.
     /// </summary>
-    /// <param name="wallet">The wallet address to check certificates for.</param>
-    /// <returns>An array of <see cref="VaultCertificate"/>'s the address has been issued.</returns>
-    VaultCertificate[] GetCertificates(Address wallet);
+    ulong NextProposalId { get; }
+
+    /// <summary>
+    /// The total number of tokens requested for active create certificate proposals.
+    /// </summary>
+    UInt256 TotalProposedAmount { get; }
+
+    /// <summary>
+    /// The minimum number of CRS tokens required to pledge to move a proposal on to a vote.
+    /// </summary>
+    ulong TotalPledgeMinimum { get; }
+
+    /// <summary>
+    /// The minimum number of CRS tokens required to vote on a proposal to have a chance to pass.
+    /// </summary>
+    ulong TotalVoteMinimum { get; }
+
+    /// <summary>
+    /// Retrieves a certificate a given address is assigned.
+    /// </summary>
+    /// <param name="wallet">The wallet address to check for a certificate.</param>
+    /// <returns>A certificate issued to the provided address.</returns>
+    Certificate GetCertificate(Address wallet);
+
+    /// <summary>
+    /// Retrieves the details about a proposal.
+    /// </summary>
+    /// <param name="proposalId">The Id number of the requested proposal.</param>
+    /// <returns>Details of the proposal.</returns>
+    ProposalDetails GetProposal(ulong proposalId);
+
+    /// <summary>
+    /// Retrieve the vote details of a voter for a specific proposal.
+    /// </summary>
+    /// <param name="proposalId">The Id number of the proposal.</param>
+    /// <param name="voter">The voter's address.</param>
+    /// <returns>Proposal vote details of the how an address voted.</returns>
+    ProposalVote GetProposalVote(ulong proposalId, Address voter);
+
+    /// <summary>
+    /// Retrieve the amount of tokens pledged by an address for a proposal.
+    /// </summary>
+    /// <param name="proposalId">The Id of the proposal to retrieve the pledge of.</param>
+    /// <param name="pledger">The address of the pledger.</param>
+    /// <returns>The number of CRS tokens pledged to the proposal by the pledger.</returns>
+    ulong GetProposalPledge(ulong proposalId, Address pledger);
+
+    /// <summary>
+    /// Retrieves an Id of a certificate proposal that the specified recipient has open, limiting to one
+    /// proposal per recipient for certificate based proposals at a time.
+    /// </summary>
+    /// <param name="recipient">The address of the certificate recipient.</param>
+    /// <returns>The Id of a proposal that the recipient has open, 0 if no proposals are open.</returns>
+    ulong GetCertificateProposalIdByRecipient(Address recipient);
 
     /// <summary>
     /// Method to allow the vault token to notify the vault of distribution to update the total supply.
@@ -51,33 +82,73 @@ public interface IOpdexVault
     void NotifyDistribution(UInt256 amount);
 
     /// <summary>
-    /// Allows the vault owner to issue new certificates to wallet addresses.
+    /// Redeems a vested certificate the sender owns and transfers the claimed tokens.
     /// </summary>
-    /// <param name="to">The address to assign the certificate of tokens to.</param>
-    /// <param name="amount">The amount of tokens to assign to the certificate.</param>
-    void CreateCertificate(Address to, UInt256 amount);
+    void RedeemCertificate();
 
     /// <summary>
-    /// Redeems all vested certificates the sender owns and transfers the claimed tokens.
+    /// Creates a new proposal for a certificate to be created. If this proposal were to pass, the recipient would receive a certificate that is vested for the <see cref="VestingDuration" />, entitling them to an amount of governance tokens in the vault.
     /// </summary>
-    void RedeemCertificates();
+    /// <param name="amount">The amount of tokens proposed the recipient's certificate be assigned.</param>
+    /// <param name="recipient">The recipient address to assign a certificate to if approved.</param>
+    /// <param name="description">A description of the proposal, limited to 200 characters, preferably a link.</param>
+    /// <returns>The Id of the generated proposal.</returns>
+    ulong CreateNewCertificateProposal(UInt256 amount, Address recipient, string description);
 
     /// <summary>
-    /// Allows the vault owner to revoke non-vested certificates by deducting from the certificate amount based on how many blocks
-    /// the certificate was vested for. Revoked certificates still hold a balance and still hold the same vested block.
+    /// Creates a new proposal for a certificate to be revoked. If this proposal were to pass, the certificate holder would only be entitled to the governance tokens accrued in the <see cref="VestingDuration" />, up to the block at which the certificate is revoked.
     /// </summary>
-    /// <param name="wallet">The wallet address to revoke non-vested certificates for.</param>
-    void RevokeCertificates(Address wallet);
+    /// <param name="recipient">The recipient of an existing certificate to have revoked.</param>
+    /// <param name="description">A description of the proposal, limited to 200 characters, preferably a link.</param>
+    /// <returns>The Id of the generated proposal.</returns>
+    ulong CreateRevokeCertificateProposal(Address recipient, string description);
 
     /// <summary>
-    /// Public method allowing the current contract owner to whitelist a new pending owner. The newly pending owner
-    /// will then call <see cref="ClaimPendingOwnership"/> to accept.
+    /// Creates a new proposal for a change to the minimum pledge total amount. If this proposal were to pass, it would alter the total amount of tokens required to pledge to a proposal, so that it can move on to a vote.
     /// </summary>
-    /// <param name="pendingOwner">The address to set as the new pending owner.</param>
-    void SetPendingOwnership(Address pendingOwner);
+    /// <param name="amount">The proposed new total pledge minimum amount.</param>
+    /// <param name="description">A description of the proposal, limited to 200 characters, preferably a link.</param>
+    /// <returns>The Id of the generated proposal.</returns>
+    ulong CreateTotalPledgeMinimumProposal(UInt256 amount, string description);
 
     /// <summary>
-    /// Public method to allow the pending new owner to accept ownership replacing the current contract owner.
+    /// Creates a new proposal for a change to the minimum vote total amount. If this proposal were to pass, it would alter the total amount of tokens required to vote on a proposal, so that it can have a chance to pass.
     /// </summary>
-    void ClaimPendingOwnership();
+    /// <param name="amount">The proposed new total vote minimum amount.</param>
+    /// <param name="description">A description of the proposal, limited to 200 characters, preferably a link.</param>
+    /// <returns>The Id of the generated proposal.</returns>
+    ulong CreateTotalVoteMinimumProposal(UInt256 amount, string description);
+
+    /// <summary>
+    /// Pledge for a proposal by temporarily locking CRS tokens to help meet the minimum pledge amount, so that it can move to an official vote.
+    /// </summary>
+    /// <param name="proposalId">The Id of the proposal to pledge to.</param>
+    void Pledge(ulong proposalId);
+
+    /// <summary>
+    /// Votes for or against a proposal by temporarily holding CRS in contract as vote weight.
+    /// </summary>
+    /// <param name="proposalId">The Id number of the proposal being voted on.</param>
+    /// <param name="inFavor">True or false indicating if the vote is in favor of the proposal or against it.</param>
+    void Vote(ulong proposalId, bool inFavor);
+
+    /// <summary>
+    /// Withdraws held CRS from proposal vote, removing the vote if still in progress.
+    /// </summary>
+    /// <param name="proposalId">The Id number of the proposal voted on.</param>
+    /// <param name="withdrawAmount">The amount of tokens to withdraw from the proposal vote.</param>
+    void WithdrawVote(ulong proposalId, ulong withdrawAmount);
+
+    /// <summary>
+    /// Withdraws CRS tokens from a proposal pledge, removing the pledge if still in progress.
+    /// </summary>
+    /// <param name="proposalId">The Id of the proposal to remove a pledge amount from.</param>
+    /// <param name="withdrawAmount">The amount to withdraw from a pledge.</param>
+    void WithdrawPledge(ulong proposalId, ulong withdrawAmount);
+
+    /// <summary>
+    /// Completes a proposal and executes the resulting command within the vault contract if approved.
+    /// </summary>
+    /// <param name="proposalId">The Id number of the proposal voted on.</param>
+    void CompleteProposal(ulong proposalId);
 }

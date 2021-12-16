@@ -15,6 +15,7 @@ namespace OpdexGovernanceTests.Base
         protected readonly ISerializer Serializer;
         protected readonly Address ODX;
         protected readonly Address MiningGovernance;
+        protected readonly Address VaultGovernance;
         protected readonly Address MiningPool1;
         protected readonly Address MiningPool2;
         protected readonly Address MiningPool3;
@@ -31,6 +32,9 @@ namespace OpdexGovernanceTests.Base
         protected readonly InMemoryState State;
         protected const ulong BlocksPerYear = 60 * 60 * 24 * 365 / 16;
         protected const ulong BlocksPerMonth = BlocksPerYear / 12;
+        protected const ulong OneDay = 60 * 60 * 24 / 16;
+        protected const ulong ThreeDays = OneDay * 3;
+        protected const ulong OneWeek = OneDay * 7;
 
         protected TestBase()
         {
@@ -77,19 +81,19 @@ namespace OpdexGovernanceTests.Base
             SetupBalance(0);
             SetupBlock(block);
             SetupCreate<OpdexMiningGovernance>(CreateResult.Succeeded(MiningGovernance), 0ul, new object[] {ODX, BlocksPerMonth});
-            SetupCreate<OpdexVault>(CreateResult.Succeeded(Vault), 0ul, new object[] {ODX, Owner, BlocksPerYear * 4});
+            SetupCreate<OpdexVault>(CreateResult.Succeeded(Vault), 0ul, new object[] {ODX, BlocksPerYear, 100ul, 200ul});
 
-            return new OpdexMinedToken(_mockContractState.Object, "Opdex", "ODX", ownerSchedule, miningSchedule, BlocksPerYear);
+            return new OpdexMinedToken(_mockContractState.Object, "Opdex", "ODX", ownerSchedule, miningSchedule, BlocksPerYear, 100, 200);
         }
 
         protected IOpdexVault CreateNewOpdexVault(ulong block = 10)
         {
-            _mockContractState.Setup(x => x.Message).Returns(new Message(MiningPool1, ODX, 0));
+            _mockContractState.Setup(x => x.Message).Returns(new Message(Vault, ODX, 0));
 
             SetupBalance(0);
             SetupBlock(block);
 
-            return new OpdexVault(_mockContractState.Object, ODX, Owner, BlocksPerYear * 4);
+            return new OpdexVault(_mockContractState.Object, ODX, BlocksPerYear, 100, 200);
         }
 
         protected void SetupMessage(Address contractAddress, Address sender, ulong value = 0)
@@ -117,6 +121,18 @@ namespace OpdexGovernanceTests.Base
                         It.Is<object[]>(p => ValidateParameters(parameters, p)), It.IsAny<ulong>()))
                 .Returns(result)
                 .Callback(() => SetupContractCallMockCallback(amountToTransfer, callback));
+        }
+
+        protected void SetupTransfer(Address to, ulong value, TransferResult result)
+        {
+            _mockInternalExecutor
+                .Setup(x => x.Transfer(_mockContractState.Object, to, value))
+                .Returns(result)
+                .Callback(() =>
+                {
+                    var balance = _mockContractState.Object.GetBalance();
+                    _mockContractState.Setup(x => x.GetBalance).Returns(() => checked(balance - value));
+                });
         }
 
         private void SetupContractCallMockCallback(ulong amountToTransfer, Action callback = null)
