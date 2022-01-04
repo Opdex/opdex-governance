@@ -2,6 +2,7 @@ using Stratis.SmartContracts;
 
 public struct ProposalDetails
 {
+    public Address Creator;
     public UInt256 Amount;
     public Address Wallet;
     public byte Type;

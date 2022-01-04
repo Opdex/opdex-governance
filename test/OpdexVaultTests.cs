@@ -9,6 +9,8 @@ namespace OpdexGovernanceTests
 {
     public class OpdexVaultTests : TestBase
     {
+        private const ulong ProposalDeposit = 50000000000ul;
+
         [Fact]
         public void CreatesOpdexVault_Success()
         {
@@ -150,7 +152,7 @@ namespace OpdexGovernanceTests
 
             var vault = CreateNewOpdexVault(block);
 
-            SetupMessage(Vault, Miner);
+            SetupMessage(Vault, Miner, ProposalDeposit);
 
             State.SetStruct($"{VaultStateKeys.Certificate}:{Miner}", certificate);
 
@@ -190,7 +192,7 @@ namespace OpdexGovernanceTests
 
             var vault = CreateNewOpdexVault(block);
 
-            SetupMessage(Vault, Miner);
+            SetupMessage(Vault, Miner, ProposalDeposit);
 
             State.SetStruct($"{VaultStateKeys.Certificate}:{Miner}", certificate);
 
@@ -219,8 +221,10 @@ namespace OpdexGovernanceTests
                 .WithMessage("OPDEX: INVALID_AMOUNT");
         }
 
-        [Fact]
-        public void CreateProposal_Throws_NotPayable()
+        [Theory]
+        [InlineData(0)]
+        [InlineData(49999999999)]
+        public void CreateProposal_Throws_InsufficientDeposit(ulong deposit)
         {
             const ulong block = 1000;
             const string description = "create a certificate.";
@@ -230,7 +234,7 @@ namespace OpdexGovernanceTests
 
             var vault = CreateNewOpdexVault(block);
 
-            SetupMessage(Vault, Miner, 10);
+            SetupMessage(Vault, Miner, deposit);
 
             State.SetStruct($"{VaultStateKeys.Certificate}:{Miner}", certificate);
 
@@ -238,25 +242,25 @@ namespace OpdexGovernanceTests
                 .Invoking(v => v.CreateNewCertificateProposal(amount, Miner, description))
                 .Should()
                 .Throw<SmartContractAssertException>()
-                .WithMessage("OPDEX: NOT_PAYABLE");
+                .WithMessage("OPDEX: INSUFFICIENT_DEPOSIT");
 
             vault
                 .Invoking(v => v.CreateRevokeCertificateProposal(Miner, description))
                 .Should()
                 .Throw<SmartContractAssertException>()
-                .WithMessage("OPDEX: NOT_PAYABLE");
+                .WithMessage("OPDEX: INSUFFICIENT_DEPOSIT");
 
             vault
                 .Invoking(v => v.CreateTotalPledgeMinimumProposal(amount, description))
                 .Should()
                 .Throw<SmartContractAssertException>()
-                .WithMessage("OPDEX: NOT_PAYABLE");
+                .WithMessage("OPDEX: INSUFFICIENT_DEPOSIT");
 
             vault
                 .Invoking(v => v.CreateTotalVoteMinimumProposal(amount, description))
                 .Should()
                 .Throw<SmartContractAssertException>()
-                .WithMessage("OPDEX: NOT_PAYABLE");
+                .WithMessage("OPDEX: INSUFFICIENT_DEPOSIT");
         }
 
         [Fact]
@@ -270,6 +274,7 @@ namespace OpdexGovernanceTests
             const ulong expectedProposalId = 1;
             var expectedProposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = amount,
                 Wallet = Miner,
                 Type = type,
@@ -284,7 +289,7 @@ namespace OpdexGovernanceTests
 
             State.SetUInt256($"{VaultStateKeys.TotalSupply}", amount);
 
-            SetupMessage(Vault, Miner);
+            SetupMessage(Vault, Miner, ProposalDeposit);
 
             var proposalId = vault.CreateNewCertificateProposal(amount, Miner, description);
 
@@ -318,6 +323,8 @@ namespace OpdexGovernanceTests
 
             State.SetStruct($"{VaultStateKeys.Certificate}:{Miner}", certificate);
 
+            SetupMessage(Vault, Miner, ProposalDeposit);
+
             vault
                 .Invoking(v => v.CreateNewCertificateProposal(amount, Miner, description))
                 .Should()
@@ -338,6 +345,8 @@ namespace OpdexGovernanceTests
 
             State.SetUInt256($"{VaultStateKeys.TotalSupply}", vaultSupply);
             State.SetUInt256($"{VaultStateKeys.TotalProposedAmount}", proposedAmount);
+
+            SetupMessage(Vault, Miner, ProposalDeposit);
 
             vault
                 .Invoking(v => v.CreateNewCertificateProposal(amount, Miner, description))
@@ -362,6 +371,8 @@ namespace OpdexGovernanceTests
             State.SetUInt256($"{VaultStateKeys.TotalProposedAmount}", proposedAmount);
             State.SetUInt64($"{VaultStateKeys.ProposalIdByRecipient}:{Miner}", proposalId);
 
+            SetupMessage(Vault, Miner, ProposalDeposit);
+
             vault
                 .Invoking(v => v.CreateNewCertificateProposal(amount, Miner, description))
                 .Should()
@@ -380,6 +391,7 @@ namespace OpdexGovernanceTests
             var certificate = new Certificate { Amount = amount, VestedBlock = BlocksPerYear + BlocksPerMonth };
             var expectedProposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = amount,
                 Wallet = Miner,
                 Type = type,
@@ -394,7 +406,7 @@ namespace OpdexGovernanceTests
 
             State.SetStruct($"{VaultStateKeys.Certificate}:{Miner}", certificate);
 
-            SetupMessage(Vault, Miner);
+            SetupMessage(Vault, Miner, ProposalDeposit);
 
             var proposalId = vault.CreateRevokeCertificateProposal(Miner, description);
 
@@ -428,6 +440,8 @@ namespace OpdexGovernanceTests
 
             State.SetStruct($"{VaultStateKeys.Certificate}:{Miner}", certificate);
 
+            SetupMessage(Vault, Miner, ProposalDeposit);
+
             vault
                 .Invoking(v => v.CreateRevokeCertificateProposal(Miner, description))
                 .Should()
@@ -448,6 +462,8 @@ namespace OpdexGovernanceTests
             State.SetStruct($"{VaultStateKeys.Certificate}:{Miner}", certificate);
             State.SetUInt64($"{VaultStateKeys.ProposalIdByRecipient}:{Miner}", proposalId);
 
+            SetupMessage(Vault, Miner, ProposalDeposit);
+
             vault
                 .Invoking(v => v.CreateRevokeCertificateProposal(Miner, description))
                 .Should()
@@ -466,6 +482,7 @@ namespace OpdexGovernanceTests
             const ulong expectedProposalId = 1;
             var expectedProposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = amount,
                 Wallet = Miner,
                 Type = type,
@@ -478,6 +495,8 @@ namespace OpdexGovernanceTests
             var vault = CreateNewOpdexVault(block);
 
             SetupMessage(Vault, Miner);
+
+            SetupMessage(Vault, Miner, ProposalDeposit);
 
             var proposalId = vault.CreateTotalPledgeMinimumProposal(amount, description);
 
@@ -507,6 +526,8 @@ namespace OpdexGovernanceTests
 
             var vault = CreateNewOpdexVault(block);
 
+            SetupMessage(Vault, Miner, ProposalDeposit);
+
             vault
                 .Invoking(v => v.CreateTotalPledgeMinimumProposal(minimumAmountRequest, description))
                 .Should()
@@ -525,6 +546,7 @@ namespace OpdexGovernanceTests
             const ulong expectedProposalId = 1;
             var expectedProposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = amount,
                 Wallet = Miner,
                 Type = type,
@@ -537,7 +559,7 @@ namespace OpdexGovernanceTests
 
             var vault = CreateNewOpdexVault(block);
 
-            SetupMessage(Vault, Miner);
+            SetupMessage(Vault, Miner, ProposalDeposit);
 
             var proposalId = vault.CreateTotalVoteMinimumProposal(amount, description);
 
@@ -565,6 +587,7 @@ namespace OpdexGovernanceTests
             const string description = "change proposal minimum.";
             UInt256 minimumAmountRequest = ((UInt256)ulong.MaxValue) + 1;
             var vault = CreateNewOpdexVault(block);
+            SetupMessage(Vault, Miner, ProposalDeposit);
 
             vault
                 .Invoking(v => v.CreateTotalVoteMinimumProposal(minimumAmountRequest, description))
@@ -590,6 +613,7 @@ namespace OpdexGovernanceTests
 
             var proposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = pledgeAmount,
                 Wallet = Miner,
                 Type = (byte)ProposalType.Create,
@@ -639,6 +663,7 @@ namespace OpdexGovernanceTests
 
             var proposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = 100,
                 Wallet = Miner,
                 Type = (byte)ProposalType.Create,
@@ -670,6 +695,7 @@ namespace OpdexGovernanceTests
 
             var proposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = 100,
                 Wallet = Miner,
                 Type = (byte)ProposalType.Create,
@@ -746,6 +772,7 @@ namespace OpdexGovernanceTests
 
             var proposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = 100,
                 Wallet = Miner,
                 Type = (byte)ProposalType.TotalPledgeMinimum,
@@ -756,10 +783,17 @@ namespace OpdexGovernanceTests
                 PledgeAmount = currentWalletPledgeAmount + 100
             };
 
+            var proposalIsActive = pledgeExpiration >= currentBlock;
             var vault = CreateNewOpdexVault(currentBlock);
 
             SetupMessage(Vault, Miner);
+            SetupBalance(currentWalletPledgeAmount + ProposalDeposit);
             SetupTransfer(Miner, withdrawAmount, TransferResult.Transferred(true));
+
+            if (!proposalIsActive && status != ProposalStatus.Complete)
+            {
+                SetupTransfer(Miner, ProposalDeposit, TransferResult.Transferred(true));
+            }
 
             State.SetUInt64($"{VaultStateKeys.ProposalPledge}:{proposalId}:{Miner}", currentWalletPledgeAmount);
             State.SetStruct($"{VaultStateKeys.Proposal}:{proposalId}", proposal);
@@ -768,7 +802,6 @@ namespace OpdexGovernanceTests
 
             var finalProposal = vault.GetProposal(proposalId);
 
-            var proposalIsActive = pledgeExpiration >= currentBlock;
             var voteWithdrawn = status == ProposalStatus.Pledge && proposalIsActive;
             var finalProposalPledgeAmount = voteWithdrawn
                 ? proposal.PledgeAmount - withdrawAmount
@@ -791,6 +824,7 @@ namespace OpdexGovernanceTests
 
             if (!proposalIsActive && status != ProposalStatus.Complete)
             {
+                VerifyTransfer(Miner, ProposalDeposit, Times.Once);
                 VerifyLog(new CompleteVaultProposalLog { ProposalId = proposalId, Approved = false }, Times.Once);
                 vault.TotalPledgeMinimum.Should().Be((ulong)proposal.Amount);
             }
@@ -810,6 +844,7 @@ namespace OpdexGovernanceTests
 
             var proposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = 100,
                 Wallet = Miner,
                 Type = (byte)ProposalType.Create,
@@ -870,6 +905,7 @@ namespace OpdexGovernanceTests
 
             var proposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = 25,
                 Wallet = Miner,
                 Type = (byte)ProposalType.Create,
@@ -924,6 +960,7 @@ namespace OpdexGovernanceTests
 
             var proposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = 25,
                 Wallet = Miner,
                 Type = (byte)ProposalType.Create,
@@ -972,6 +1009,7 @@ namespace OpdexGovernanceTests
 
             var proposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = 25,
                 Wallet = Miner,
                 Type = (byte)ProposalType.Create,
@@ -1005,6 +1043,7 @@ namespace OpdexGovernanceTests
             var existingVote = new ProposalVote { InFavor = previousVoteInFavor, Amount = 100 };
             var proposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = 25,
                 Wallet = Miner,
                 Type = (byte)ProposalType.Create,
@@ -1039,6 +1078,7 @@ namespace OpdexGovernanceTests
             var existingVote = new ProposalVote { InFavor = previousVoteInFavor, Amount = 100 };
             var proposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = 25,
                 Wallet = Miner,
                 Type = (byte)ProposalType.Create,
@@ -1083,11 +1123,13 @@ namespace OpdexGovernanceTests
             var expectedWalletVoteAmount = currentWalletVoteAmount - withdrawAmount;
 
             var existingVote = new ProposalVote { InFavor = inFavor, Amount = currentWalletVoteAmount };
+            var proposalIsActive = voteExpiration >= currentBlock;
             const ulong currentYesAmount = 500;
             const ulong currentNoAmount = 1000;
 
             var proposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = 100,
                 Wallet = Miner,
                 Type = (byte)ProposalType.TotalVoteMinimum,
@@ -1101,10 +1143,16 @@ namespace OpdexGovernanceTests
             var vault = CreateNewOpdexVault(currentBlock);
 
             SetupMessage(Vault, Miner);
+            SetupBalance(currentWalletVoteAmount + ProposalDeposit);
             SetupTransfer(Miner, withdrawAmount, TransferResult.Transferred(true));
 
             State.SetStruct($"{VaultStateKeys.ProposalVote}:{proposalId}:{Miner}", existingVote);
             State.SetStruct($"{VaultStateKeys.Proposal}:{proposalId}", proposal);
+
+            if (!proposalIsActive && status != ProposalStatus.Complete)
+            {
+                SetupTransfer(Miner, ProposalDeposit, TransferResult.Transferred(true));
+            }
 
             vault.WithdrawVote(proposalId, withdrawAmount);
 
@@ -1113,7 +1161,6 @@ namespace OpdexGovernanceTests
             ulong finalYesAmount = currentYesAmount;
             ulong finalNoAmount = currentNoAmount;
 
-            var proposalIsActive = voteExpiration >= currentBlock;
             var voteWithdrawn = status == ProposalStatus.Vote && proposalIsActive;
 
             if (voteWithdrawn)
@@ -1141,6 +1188,7 @@ namespace OpdexGovernanceTests
 
             if (!proposalIsActive && status != ProposalStatus.Complete)
             {
+                VerifyTransfer(Miner, ProposalDeposit, Times.Once);
                 VerifyLog(new CompleteVaultProposalLog { ProposalId = proposalId, Approved = false }, Times.Once);
                 vault.TotalPledgeMinimum.Should().Be((ulong)proposal.Amount);
             }
@@ -1161,6 +1209,7 @@ namespace OpdexGovernanceTests
             var existingVote = new ProposalVote { InFavor = true, Amount = currentWalletVoteAmount };
             var proposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = 100,
                 Wallet = Miner,
                 Type = (byte)ProposalType.Create,
@@ -1265,6 +1314,7 @@ namespace OpdexGovernanceTests
             const ulong block = 1000;
             var proposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = 25,
                 Wallet = Miner,
                 Type = (byte)ProposalType.Create,
@@ -1296,6 +1346,7 @@ namespace OpdexGovernanceTests
             const ulong block = 1000;
             var proposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = 25,
                 Wallet = Miner,
                 Type = (byte)ProposalType.Create,
@@ -1332,6 +1383,7 @@ namespace OpdexGovernanceTests
 
             var proposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = amount,
                 Wallet = Miner,
                 Type = (byte)ProposalType.Create,
@@ -1345,6 +1397,7 @@ namespace OpdexGovernanceTests
             var vault = CreateNewOpdexVault(block);
 
             SetupMessage(Vault, Miner);
+            SetupTransfer(Miner, ProposalDeposit, TransferResult.Transferred(true));
 
             State.SetStruct($"{VaultStateKeys.Proposal}:{proposalId}", proposal);
             State.SetUInt256(VaultStateKeys.TotalSupply, currentTotalSupply);
@@ -1365,6 +1418,7 @@ namespace OpdexGovernanceTests
             vault.TotalSupply.Should().Be(expectedTotalSupply);
             vault.GetCertificateProposalIdByRecipient(Miner).Should().Be(0ul);
 
+            VerifyTransfer(Miner, ProposalDeposit, Times.Once);
             VerifyLog(new CreateVaultCertificateLog { Owner = Miner, Amount = amount, VestedBlock = expectedVestedBlock }, Times.Once);
             VerifyLog(new CompleteVaultProposalLog { ProposalId = proposalId, Approved = true }, Times.Once);
         }
@@ -1384,6 +1438,7 @@ namespace OpdexGovernanceTests
 
             var proposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = amount,
                 Wallet = Miner,
                 Type = (byte)ProposalType.Create,
@@ -1397,6 +1452,7 @@ namespace OpdexGovernanceTests
             var vault = CreateNewOpdexVault(block);
 
             SetupMessage(Vault, Miner);
+            SetupTransfer(Miner, ProposalDeposit, TransferResult.Transferred(true));
 
             State.SetStruct($"{VaultStateKeys.Proposal}:{proposalId}", proposal);
             State.SetUInt256(VaultStateKeys.TotalSupply, currentTotalSupply);
@@ -1415,6 +1471,7 @@ namespace OpdexGovernanceTests
             vault.TotalSupply.Should().Be(expectedTotalSupply);
             vault.GetCertificateProposalIdByRecipient(Miner).Should().Be(0ul);
 
+            VerifyTransfer(Miner, ProposalDeposit, Times.Once);
             VerifyLog(It.IsAny<CreateVaultCertificateLog>(), Times.Never);
             VerifyLog(new CompleteVaultProposalLog { ProposalId = proposalId, Approved = false }, Times.Once);
         }
@@ -1434,6 +1491,7 @@ namespace OpdexGovernanceTests
 
             var proposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = currentAmount,
                 Wallet = Miner,
                 Type = (byte)ProposalType.Revoke,
@@ -1447,6 +1505,7 @@ namespace OpdexGovernanceTests
             var vault = CreateNewOpdexVault(block);
 
             SetupMessage(Vault, Miner);
+            SetupTransfer(Miner, ProposalDeposit, TransferResult.Transferred(true));
 
             State.SetStruct($"{VaultStateKeys.Proposal}:{proposalId}", proposal);
             State.SetUInt256(VaultStateKeys.TotalSupply, currentTotalSupply);
@@ -1466,6 +1525,7 @@ namespace OpdexGovernanceTests
             vault.TotalSupply.Should().Be(expectedTotalSupply);
             vault.GetCertificateProposalIdByRecipient(Miner).Should().Be(0ul);
 
+            VerifyTransfer(Miner, ProposalDeposit, Times.Once);
             VerifyLog(new RevokeVaultCertificateLog { Owner = Miner, OldAmount = currentAmount, NewAmount = expectedAmount, VestedBlock = BlocksPerYear }, Times.Once);
             VerifyLog(new CompleteVaultProposalLog { ProposalId = proposalId, Approved = true }, Times.Once);
         }
@@ -1484,6 +1544,7 @@ namespace OpdexGovernanceTests
 
             var proposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = amount,
                 Wallet = Miner,
                 Type = (byte)ProposalType.Revoke,
@@ -1497,6 +1558,7 @@ namespace OpdexGovernanceTests
             var vault = CreateNewOpdexVault(block);
 
             SetupMessage(Vault, Miner);
+            SetupTransfer(Miner, ProposalDeposit, TransferResult.Transferred(true));
 
             State.SetStruct($"{VaultStateKeys.Proposal}:{proposalId}", proposal);
             State.SetUInt256(VaultStateKeys.TotalSupply, currentTotalSupply);
@@ -1516,6 +1578,7 @@ namespace OpdexGovernanceTests
             vault.TotalSupply.Should().Be(expectedTotalSupply);
             vault.GetCertificateProposalIdByRecipient(Miner).Should().Be(0ul);
 
+            VerifyTransfer(Miner, ProposalDeposit, Times.Once);
             VerifyLog(It.IsAny<RevokeVaultCertificateLog>(), Times.Never);
             VerifyLog(new CompleteVaultProposalLog { ProposalId = proposalId, Approved = false }, Times.Once);
         }
@@ -1531,6 +1594,7 @@ namespace OpdexGovernanceTests
 
             var proposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = amount,
                 Wallet = Miner,
                 Type = (byte)ProposalType.Revoke,
@@ -1544,6 +1608,7 @@ namespace OpdexGovernanceTests
             var vault = CreateNewOpdexVault(block);
 
             SetupMessage(Vault, Miner);
+            SetupTransfer(Miner, ProposalDeposit, TransferResult.Transferred(true));
 
             State.SetStruct($"{VaultStateKeys.Proposal}:{proposalId}", proposal);
             State.SetUInt256(VaultStateKeys.TotalSupply, currentTotalSupply);
@@ -1563,6 +1628,7 @@ namespace OpdexGovernanceTests
             vault.TotalSupply.Should().Be(currentTotalSupply);
             vault.GetCertificateProposalIdByRecipient(Miner).Should().Be(0ul);
 
+            VerifyTransfer(Miner, ProposalDeposit, Times.Once);
             VerifyLog(It.IsAny<RevokeVaultCertificateLog>(), Times.Never);
             VerifyLog(new CompleteVaultProposalLog { ProposalId = proposalId, Approved = true }, Times.Once);
         }
@@ -1577,6 +1643,7 @@ namespace OpdexGovernanceTests
 
             var proposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = requestedTotalPledgeMinimum,
                 Wallet = Miner,
                 Type = (byte)ProposalType.TotalPledgeMinimum,
@@ -1590,6 +1657,7 @@ namespace OpdexGovernanceTests
             var vault = CreateNewOpdexVault(block);
 
             SetupMessage(Vault, Miner);
+            SetupTransfer(Miner, ProposalDeposit, TransferResult.Transferred(true));
 
             State.SetStruct($"{VaultStateKeys.Proposal}:{proposalId}", proposal);
             State.SetUInt64(VaultStateKeys.TotalPledgeMinimum, currentTotalPledgeMinimum);
@@ -1601,6 +1669,7 @@ namespace OpdexGovernanceTests
 
             vault.TotalPledgeMinimum.Should().Be((ulong)requestedTotalPledgeMinimum);
 
+            VerifyTransfer(Miner, ProposalDeposit, Times.Once);
             VerifyLog(new CompleteVaultProposalLog { ProposalId = proposalId, Approved = true }, Times.Once);
         }
 
@@ -1616,6 +1685,7 @@ namespace OpdexGovernanceTests
 
             var proposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = requestedTotalPledgeMinimum,
                 Wallet = Miner,
                 Type = (byte)ProposalType.TotalPledgeMinimum,
@@ -1629,6 +1699,7 @@ namespace OpdexGovernanceTests
             var vault = CreateNewOpdexVault(block);
 
             SetupMessage(Vault, Miner);
+            SetupTransfer(Miner, ProposalDeposit, TransferResult.Transferred(true));
 
             State.SetStruct($"{VaultStateKeys.Proposal}:{proposalId}", proposal);
             State.SetUInt64(VaultStateKeys.TotalPledgeMinimum, pledgeMinimum);
@@ -1640,6 +1711,7 @@ namespace OpdexGovernanceTests
 
             vault.TotalPledgeMinimum.Should().Be(pledgeMinimum);
 
+            VerifyTransfer(Miner, ProposalDeposit, Times.Once);
             VerifyLog(new CompleteVaultProposalLog { ProposalId = proposalId, Approved = false }, Times.Once);
         }
 
@@ -1653,6 +1725,7 @@ namespace OpdexGovernanceTests
 
             var proposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = requestedTotalVoteMinimum,
                 Wallet = Miner,
                 Type = (byte)ProposalType.TotalVoteMinimum,
@@ -1666,6 +1739,7 @@ namespace OpdexGovernanceTests
             var vault = CreateNewOpdexVault(block);
 
             SetupMessage(Vault, Miner);
+            SetupTransfer(Miner, ProposalDeposit, TransferResult.Transferred(true));
 
             State.SetStruct($"{VaultStateKeys.Proposal}:{proposalId}", proposal);
             State.SetUInt64(VaultStateKeys.TotalVoteMinimum, minimumProposalAmount);
@@ -1677,6 +1751,7 @@ namespace OpdexGovernanceTests
 
             vault.TotalVoteMinimum.Should().Be((ulong)requestedTotalVoteMinimum);
 
+            VerifyTransfer(Miner, ProposalDeposit, Times.Once);
             VerifyLog(new CompleteVaultProposalLog { ProposalId = proposalId, Approved = true }, Times.Once);
         }
 
@@ -1692,6 +1767,7 @@ namespace OpdexGovernanceTests
 
             var proposal = new ProposalDetails
             {
+                Creator = Miner,
                 Amount = requestedTotalVoteMinimum,
                 Wallet = Miner,
                 Type = (byte)ProposalType.TotalVoteMinimum,
@@ -1705,6 +1781,7 @@ namespace OpdexGovernanceTests
             var vault = CreateNewOpdexVault(block);
 
             SetupMessage(Vault, Miner);
+            SetupTransfer(Miner, ProposalDeposit, TransferResult.Transferred(true));
 
             State.SetStruct($"{VaultStateKeys.Proposal}:{proposalId}", proposal);
             State.SetUInt64(VaultStateKeys.TotalVoteMinimum, minimumProposalAmount);
@@ -1716,6 +1793,7 @@ namespace OpdexGovernanceTests
 
             vault.TotalVoteMinimum.Should().Be(minimumProposalAmount);
 
+            VerifyTransfer(Miner, ProposalDeposit, Times.Once);
             VerifyLog(new CompleteVaultProposalLog { ProposalId = proposalId, Approved = false }, Times.Once);
         }
 
