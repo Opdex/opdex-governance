@@ -8,6 +8,7 @@ public class OpdexVault : SmartContract, IOpdexVault
     private const ulong OneDay = 60 * 60 * 24 / 16;
     private const ulong VoteDuration = OneDay * 3;
     private const ulong PledgeDuration = OneDay * 7;
+    private const ulong ProposalDeposit = 50000000000ul; // 500 CRS
 
     /// <summary>
     /// Constructor initializing an empty vault smart contract.
@@ -421,6 +422,7 @@ public class OpdexVault : SmartContract, IOpdexVault
 
         SetProposal(proposalId, new ProposalDetails
         {
+            Creator = Message.Sender,
             Wallet = wallet,
             Amount = amount,
             Type = type,
@@ -438,6 +440,8 @@ public class OpdexVault : SmartContract, IOpdexVault
             Status = status,
             Expiration = expiration
         });
+
+        SafeTransfer(Message.Sender, Message.Value - ProposalDeposit);
 
         return proposalId;
     }
@@ -466,12 +470,14 @@ public class OpdexVault : SmartContract, IOpdexVault
             if (proposalType == ProposalType.Create) TotalProposedAmount -= proposal.Amount;
         }
 
+        SafeTransfer(proposal.Creator, ProposalDeposit);
+
         Log(new CompleteVaultProposalLog { ProposalId = proposalId, Approved = approved });
     }
 
     private void ValidateProposal(UInt256 amount, string description)
     {
-        EnsureNotPayable();
+        Assert(Message.Value >= ProposalDeposit, "OPDEX: INSUFFICIENT_DEPOSIT");
         Assert(!string.IsNullOrWhiteSpace(description) && description.Length <= 200, "OPDEX: INVALID_DESCRIPTION");
         Assert(amount > 0, "OPDEX: INVALID_AMOUNT");
     }

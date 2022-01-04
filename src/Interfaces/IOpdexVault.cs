@@ -87,7 +87,7 @@ public interface IOpdexVault
     void RedeemCertificate();
 
     /// <summary>
-    /// Creates a new proposal for a certificate to be created. If this proposal were to pass, the recipient would receive a certificate that is vested for the <see cref="VestingDuration" />, entitling them to an amount of governance tokens in the vault.
+    /// Creates a new proposal for a certificate to be created for a 500 CRS deposit, returned upon proposal completion. If this proposal were to pass, the recipient would receive a certificate that is vested for the <see cref="VestingDuration" />, entitling them to an amount of governance tokens in the vault.
     /// </summary>
     /// <param name="amount">The amount of tokens proposed the recipient's certificate be assigned.</param>
     /// <param name="recipient">The recipient address to assign a certificate to if approved.</param>
@@ -96,7 +96,7 @@ public interface IOpdexVault
     ulong CreateNewCertificateProposal(UInt256 amount, Address recipient, string description);
 
     /// <summary>
-    /// Creates a new proposal for a certificate to be revoked. If this proposal were to pass, the certificate holder would only be entitled to the governance tokens accrued in the <see cref="VestingDuration" />, up to the block at which the certificate is revoked.
+    /// Creates a new proposal for a certificate to be revoked for a 500 CRS deposit, returned upon proposal completion. If this proposal were to pass, the certificate holder would only be entitled to the governance tokens accrued in the <see cref="VestingDuration" />, up to the block at which the certificate is revoked.
     /// </summary>
     /// <param name="recipient">The recipient of an existing certificate to have revoked.</param>
     /// <param name="description">A description of the proposal, limited to 200 characters, preferably a link.</param>
@@ -104,7 +104,7 @@ public interface IOpdexVault
     ulong CreateRevokeCertificateProposal(Address recipient, string description);
 
     /// <summary>
-    /// Creates a new proposal for a change to the minimum pledge total amount. If this proposal were to pass, it would alter the total amount of tokens required to pledge to a proposal, so that it can move on to a vote.
+    /// Creates a new proposal for a change to the minimum pledge total amount for a 500 CRS deposit, returned upon proposal completion. If this proposal were to pass, it would alter the total amount of tokens required to pledge to a proposal, so that it can move on to a vote.
     /// </summary>
     /// <param name="amount">The proposed new total pledge minimum amount.</param>
     /// <param name="description">A description of the proposal, limited to 200 characters, preferably a link.</param>
@@ -112,7 +112,7 @@ public interface IOpdexVault
     ulong CreateTotalPledgeMinimumProposal(UInt256 amount, string description);
 
     /// <summary>
-    /// Creates a new proposal for a change to the minimum vote total amount. If this proposal were to pass, it would alter the total amount of tokens required to vote on a proposal, so that it can have a chance to pass.
+    /// Creates a new proposal for a change to the minimum vote total amount for a 500 CRS deposit, returned upon proposal completion. If this proposal were to pass, it would alter the total amount of tokens required to vote on a proposal, so that it can have a chance to pass.
     /// </summary>
     /// <param name="amount">The proposed new total vote minimum amount.</param>
     /// <param name="description">A description of the proposal, limited to 200 characters, preferably a link.</param>
@@ -147,7 +147,7 @@ public interface IOpdexVault
     void WithdrawPledge(ulong proposalId, ulong withdrawAmount);
 
     /// <summary>
-    /// Completes a proposal and executes the resulting command within the vault contract if approved.
+    /// Completes a proposal and executes the resulting command within the vault contract if approved. Upon completion returns the 500 CRS deposit back to the proposal creator.
     /// </summary>
     /// <param name="proposalId">The Id number of the proposal voted on.</param>
     void CompleteProposal(ulong proposalId);
