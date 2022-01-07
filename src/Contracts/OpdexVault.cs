@@ -477,6 +477,7 @@ public class OpdexVault : SmartContract, IOpdexVault
 
     private void ValidateProposal(UInt256 amount, string description)
     {
+        Assert(!State.IsContract(Message.Sender), "OPDEX: INVALID_CREATOR");
         Assert(Message.Value >= ProposalDeposit, "OPDEX: INSUFFICIENT_DEPOSIT");
         Assert(!string.IsNullOrWhiteSpace(description) && description.Length <= 200, "OPDEX: INVALID_DESCRIPTION");
         Assert(amount > 0, "OPDEX: INVALID_AMOUNT");
