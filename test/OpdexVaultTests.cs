@@ -264,6 +264,47 @@ namespace OpdexGovernanceTests
         }
 
         [Fact]
+        public void CreateProposal_Throws_InvalidCreator()
+        {
+            const ulong block = 1000;
+            const string description = "create a certificate.";
+            UInt256 amount = 0;
+
+            var certificate = new Certificate { Amount = amount, VestedBlock = BlocksPerYear, Revoked = false };
+
+            var vault = CreateNewOpdexVault(block);
+
+            SetupMessage(Vault, Miner, ProposalDeposit);
+
+            State.SetContract(Miner, true);
+            State.SetStruct($"{VaultStateKeys.Certificate}:{Miner}", certificate);
+
+            vault
+                .Invoking(v => v.CreateNewCertificateProposal(amount, Miner, description))
+                .Should()
+                .Throw<SmartContractAssertException>()
+                .WithMessage("OPDEX: INVALID_CREATOR");
+
+            vault
+                .Invoking(v => v.CreateRevokeCertificateProposal(Miner, description))
+                .Should()
+                .Throw<SmartContractAssertException>()
+                .WithMessage("OPDEX: INVALID_CREATOR");
+
+            vault
+                .Invoking(v => v.CreateTotalPledgeMinimumProposal(amount, description))
+                .Should()
+                .Throw<SmartContractAssertException>()
+                .WithMessage("OPDEX: INVALID_CREATOR");
+
+            vault
+                .Invoking(v => v.CreateTotalVoteMinimumProposal(amount, description))
+                .Should()
+                .Throw<SmartContractAssertException>()
+                .WithMessage("OPDEX: INVALID_CREATOR");
+        }
+
+        [Fact]
         public void NewCertificateProposal_Success()
         {
             const ulong block = 1000;
